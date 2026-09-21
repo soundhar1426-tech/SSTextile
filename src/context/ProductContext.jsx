@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import api from '../api/axios';
 import { initialProducts, millInfo } from '../data/mockData';
 
@@ -131,6 +131,11 @@ export const ProductProvider = ({ children }) => {
     });
   }, []);
 
+  const productsRef = useRef(products);
+  useEffect(() => {
+    productsRef.current = products;
+  }, [products]);
+
   /**
    * Fetch single product by ID from MongoDB or active catalog
    */
@@ -139,8 +144,8 @@ export const ProductProvider = ({ children }) => {
 
     const cleanId = String(productId).trim();
 
-    // 1. Check current memory state first
-    const currentList = products.length > 0 ? products : getInitialProducts();
+    // 1. Check current memory / local cache first for instant 0ms retrieval
+    const currentList = (productsRef.current && productsRef.current.length > 0) ? productsRef.current : getInitialProducts();
     let localProduct = currentList.find(
       (p) =>
         String(p.id) === cleanId ||
@@ -149,15 +154,20 @@ export const ProductProvider = ({ children }) => {
         (p.title && p.title.toLowerCase() === cleanId.toLowerCase())
     );
 
-    // 2. Try fetching from live backend
+    // If localProduct has full sizes, return immediately
+    if (localProduct && Array.isArray(localProduct.sizes) && localProduct.sizes.length > 0) {
+      return { success: true, product: localProduct };
+    }
+
+    // 2. Try fetching from live backend with a fast timeout (2500ms)
     try {
-      const response = await api.get(`/products/${cleanId}`);
+      const response = await api.get(`/products/${cleanId}`, { timeout: 2500 });
       if (response.data?.success && response.data.product) {
         return { success: true, product: response.data.product };
       }
     } catch (err) {
       try {
-        const adminRes = await api.get(`/admin/products/${cleanId}`);
+        const adminRes = await api.get(`/admin/products/${cleanId}`, { timeout: 2500 });
         if (adminRes.data?.success && adminRes.data.product) {
           return { success: true, product: adminRes.data.product };
         }
@@ -168,13 +178,13 @@ export const ProductProvider = ({ children }) => {
       return { success: true, product: localProduct };
     }
 
-    // 3. Fallback to first product if only 1 exists in catalog
+    // 3. Fallback to first product in active catalog
     if (currentList.length > 0) {
       return { success: true, product: currentList[0] };
     }
 
     return { success: false, error: 'Product not found', status: 404 };
-  }, [products]);
+  }, []);
 
   /**
    * Fetch inventory summary metrics

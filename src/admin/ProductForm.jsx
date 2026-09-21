@@ -32,73 +32,121 @@ export const ProductForm = () => {
   const multiFileInputRef = useRef(null);
   const singleSlotFileInputRef = useRef(null);
   const [activeUploadSlot, setActiveUploadSlot] = useState(0);
+  const hasLoadedIdRef = useRef(null);
 
   const isEdit = Boolean(id);
 
-  const [formData, setFormData] = useState({
-    title: '',
-    subtitle: '',
-    category: 'White Towels',
-    hsnCode: '6302.60',
-    gsmRange: '500 - 650 GSM',
-    weaveType: '2/20s Ring Spun',
-    material: '100% Cotton',
-    active: true,
+  // Synchronously find initial product from memory/localStorage
+  const getInitialProduct = () => {
+    if (!id) return null;
+    const cleanId = String(id).trim();
+    const list = Array.isArray(products) && products.length > 0 ? products : [];
+    let found = list.find(
+      (p) =>
+        String(p.id) === cleanId ||
+        String(p._id) === cleanId ||
+        (p.name && p.name.toLowerCase() === cleanId.toLowerCase()) ||
+        (p.title && p.title.toLowerCase() === cleanId.toLowerCase())
+    );
+    if (!found) {
+      try {
+        const saved = localStorage.getItem('gtex_catalog_products');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            found = parsed.find(
+              (p) =>
+                String(p.id) === cleanId ||
+                String(p._id) === cleanId ||
+                (p.name && p.name.toLowerCase() === cleanId.toLowerCase()) ||
+                (p.title && p.title.toLowerCase() === cleanId.toLowerCase())
+            ) || parsed[0];
+          }
+        }
+      } catch (e) {}
+    }
+    return found || (list.length > 0 ? list[0] : null);
+  };
+
+  const initialProduct = getInitialProduct();
+
+  const [formData, setFormData] = useState(() => {
+    if (initialProduct) {
+      return {
+        title: initialProduct.name || initialProduct.title || 'White Towels',
+        subtitle: initialProduct.description || initialProduct.subtitle || 'Direct Weaving Mill 100% Cotton Plain White Terry Towels',
+        category: initialProduct.category || 'White Towels',
+        hsnCode: initialProduct.hsnCode || '6302.60',
+        gsmRange: initialProduct.gsmRange || '500 - 650 GSM',
+        weaveType: initialProduct.weaveType || '2/20s Ring Spun',
+        material: initialProduct.material || '100% Cotton',
+        active: initialProduct.active !== false,
+      };
+    }
+    return {
+      title: '',
+      subtitle: '',
+      category: 'White Towels',
+      hsnCode: '6302.60',
+      gsmRange: '500 - 650 GSM',
+      weaveType: '2/20s Ring Spun',
+      material: '100% Cotton',
+      active: true,
+    };
   });
 
-  const [images, setImages] = useState([
-    sampleImages[0].url,
-    sampleImages[1].url,
-  ]);
+  const [images, setImages] = useState(() => {
+    if (initialProduct) {
+      const pImages = Array.isArray(initialProduct.images) && initialProduct.images.length > 0
+        ? initialProduct.images.filter(Boolean)
+        : initialProduct.image
+        ? [initialProduct.image]
+        : [sampleImages[0].url];
+      return pImages.length > 0 ? pImages : [sampleImages[0].url];
+    }
+    return [sampleImages[0].url, sampleImages[1].url];
+  });
 
   const [activePreviewIndex, setActivePreviewIndex] = useState(0);
   const [imageSourceMode, setImageSourceMode] = useState('UPLOAD'); // 'UPLOAD' | 'PRESETS' | 'URL'
   const [urlInputVal, setUrlInputVal] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [loadingProduct, setLoadingProduct] = useState(isEdit);
   const [errorMessage, setErrorMessage] = useState('');
   const [successBanner, setSuccessBanner] = useState('');
 
-  // Dynamic sizes list
-  const [sizes, setSizes] = useState([
-    {
-      id: `sz-init-1`,
-      size: '25x50',
-      dimension: '25x50 cm',
-      widthCm: 25,
-      lengthCm: 50,
-      price: 80,
-      stock: 500,
-      gsm: 500,
-      grams: 63,
-      weightKg: 0.063,
-    },
-    {
-      id: `sz-init-2`,
-      size: '30x60',
-      dimension: '30x60 cm',
-      widthCm: 30,
-      lengthCm: 60,
-      price: 120,
-      stock: 750,
-      gsm: 550,
-      grams: 99,
-      weightKg: 0.099,
-    },
-    {
-      id: `sz-init-3`,
-      size: '40x80',
-      dimension: '40x80 cm',
-      widthCm: 40,
-      lengthCm: 80,
-      price: 160,
-      stock: 400,
-      gsm: 600,
-      grams: 192,
-      weightKg: 0.192,
-    },
-  ]);
+  // Dynamic sizes list initialized instantly
+  const [sizes, setSizes] = useState(() => {
+    if (initialProduct && Array.isArray(initialProduct.sizes) && initialProduct.sizes.length > 0) {
+      return initialProduct.sizes.map((s, idx) => {
+        const dimStr = s.dimension || `${s.size} cm` || '25x50 cm';
+        const sizeKey = s.size || dimStr.replace(/cm|inch|in/gi, '').replace(/[×*X]/g, 'x').replace(/\s+/g, '').trim();
+        const g = Number(s.grams) || Math.round(Number(s.weightKg || 0.1) * 1000) || 100;
+        return {
+          id: s._id || s.id || `sz-edit-${idx}`,
+          _id: s._id || s.id || `sz-edit-${idx}`,
+          size: sizeKey,
+          dimension: dimStr,
+          price: Number(s.price) || 0,
+          stock: Number(s.stock) || 0,
+          gsm: Number(s.gsm) || 500,
+          grams: g,
+          weightKg: Number(s.weightKg) || Number((g / 1000).toFixed(3)),
+        };
+      });
+    }
+    return [
+      { id: 'sz-init-1', size: '20x40', dimension: '20x40 cm', widthCm: 20, lengthCm: 40, price: 60, stock: 600, gsm: 450, grams: 36, weightKg: 0.036 },
+      { id: 'sz-init-2', size: '25x50', dimension: '25x50 cm', widthCm: 25, lengthCm: 50, price: 80, stock: 500, gsm: 500, grams: 63, weightKg: 0.063 },
+      { id: 'sz-init-3', size: '30x60', dimension: '30x60 cm', widthCm: 30, lengthCm: 60, price: 120, stock: 750, gsm: 550, grams: 99, weightKg: 0.099 },
+      { id: 'sz-init-4', size: '35x70', dimension: '35x70 cm', widthCm: 35, lengthCm: 70, price: 140, stock: 450, gsm: 550, grams: 135, weightKg: 0.135 },
+      { id: 'sz-init-5', size: '40x80', dimension: '40x80 cm', widthCm: 40, lengthCm: 80, price: 160, stock: 400, gsm: 600, grams: 192, weightKg: 0.192 },
+      { id: 'sz-init-6', size: '50x100', dimension: '50x100 cm', widthCm: 50, lengthCm: 100, price: 220, stock: 350, gsm: 600, grams: 300, weightKg: 0.300 },
+      { id: 'sz-init-7', size: '70x140', dimension: '70x140 cm', widthCm: 70, lengthCm: 140, price: 380, stock: 300, gsm: 650, grams: 637, weightKg: 0.637 },
+      { id: 'sz-init-8', size: '75x150', dimension: '75x150 cm', widthCm: 75, lengthCm: 150, price: 420, stock: 250, gsm: 650, grams: 731, weightKg: 0.731 },
+      { id: 'sz-init-9', size: '80x160', dimension: '80x160 cm', widthCm: 80, lengthCm: 160, price: 480, stock: 200, gsm: 700, grams: 896, weightKg: 0.896 },
+    ];
+  });
 
   // Drawer / Subform for adding a new dynamic size
   const [showAddSizeDrawer, setShowAddSizeDrawer] = useState(false);
@@ -122,66 +170,70 @@ export const ProductForm = () => {
     setNewSizeForm(updated);
   };
 
-  // Load product if editing
+  // Revalidate with latest backend data if editing
   useEffect(() => {
-    if (isEdit && id) {
-      const fetchProductDetail = async () => {
-        setLoadingProduct(true);
-        try {
-          const res = await getProductById(id);
-          if (res && (res.success || res.product)) {
-            const p = res.product || res;
-            setFormData({
-              title: p.name || p.title || 'White Towels',
-              subtitle: p.description || p.subtitle || 'Direct Weaving Mill Cotton Plain White Terry Towels',
-              category: p.category || 'White Towels',
-              hsnCode: p.hsnCode || '6302.60',
-              gsmRange: p.gsmRange || '500 - 650 GSM',
-              weaveType: p.weaveType || '2/20s Ring Spun',
-              material: p.material || '100% Cotton',
-              active: p.active !== false,
-            });
+    if (!isEdit || !id) return;
+    if (hasLoadedIdRef.current === id) return;
+    hasLoadedIdRef.current = id;
 
-            const productImages =
-              Array.isArray(p.images) && p.images.length > 0
-                ? p.images.filter(Boolean)
-                : p.image
-                ? [p.image]
-                : [sampleImages[0].url];
+    let isMounted = true;
 
-            setImages(productImages.length > 0 ? productImages : [sampleImages[0].url]);
-            setActivePreviewIndex(0);
+    const fetchProductDetail = async () => {
+      try {
+        const res = await getProductById(id);
+        if (isMounted && res && (res.success || res.product)) {
+          const p = res.product || res;
+          setFormData({
+            title: p.name || p.title || 'White Towels',
+            subtitle: p.description || p.subtitle || 'Direct Weaving Mill Cotton Plain White Terry Towels',
+            category: p.category || 'White Towels',
+            hsnCode: p.hsnCode || '6302.60',
+            gsmRange: p.gsmRange || '500 - 650 GSM',
+            weaveType: p.weaveType || '2/20s Ring Spun',
+            material: p.material || '100% Cotton',
+            active: p.active !== false,
+          });
 
-            if (Array.isArray(p.sizes) && p.sizes.length > 0) {
-              setSizes(
-                p.sizes.map((s, idx) => {
-                  const dimStr = s.dimension || `${s.size} cm` || '25x50 cm';
-                  const sizeKey = s.size || dimStr.replace(/cm|inch|in/gi, '').replace(/[×*X]/g, 'x').replace(/\s+/g, '').trim();
-                  const g = Number(s.grams) || Math.round(Number(s.weightKg || 0.1) * 1000) || 100;
-                  return {
-                    id: s._id || s.id || `sz-edit-${idx}`,
-                    _id: s._id || s.id || `sz-edit-${idx}`,
-                    size: sizeKey,
-                    dimension: dimStr,
-                    price: Number(s.price) || 0,
-                    stock: Number(s.stock) || 0,
-                    gsm: Number(s.gsm) || 500,
-                    grams: g,
-                    weightKg: Number(s.weightKg) || Number((g / 1000).toFixed(3)),
-                  };
-                })
-              );
-            }
+          const productImages =
+            Array.isArray(p.images) && p.images.length > 0
+              ? p.images.filter(Boolean)
+              : p.image
+              ? [p.image]
+              : [sampleImages[0].url];
+
+          setImages(productImages.length > 0 ? productImages : [sampleImages[0].url]);
+
+          if (Array.isArray(p.sizes) && p.sizes.length > 0) {
+            setSizes(
+              p.sizes.map((s, idx) => {
+                const dimStr = s.dimension || `${s.size} cm` || '25x50 cm';
+                const sizeKey = s.size || dimStr.replace(/cm|inch|in/gi, '').replace(/[×*X]/g, 'x').replace(/\s+/g, '').trim();
+                const g = Number(s.grams) || Math.round(Number(s.weightKg || 0.1) * 1000) || 100;
+                return {
+                  id: s._id || s.id || `sz-edit-${idx}`,
+                  _id: s._id || s.id || `sz-edit-${idx}`,
+                  size: sizeKey,
+                  dimension: dimStr,
+                  price: Number(s.price) || 0,
+                  stock: Number(s.stock) || 0,
+                  gsm: Number(s.gsm) || 500,
+                  grams: g,
+                  weightKg: Number(s.weightKg) || Number((g / 1000).toFixed(3)),
+                };
+              })
+            );
           }
-        } catch (err) {
-          console.warn('[ProductForm] Notice loading product detail:', err);
-        } finally {
-          setLoadingProduct(false);
         }
-      };
+      } catch (err) {
+        console.warn('[ProductForm] Notice loading product detail:', err);
+      }
+    };
 
-      fetchProductDetail();
-    }
+    fetchProductDetail();
+
+    return () => {
+      isMounted = false;
+    };
   }, [id, isEdit, getProductById]);
 
   // Client-side canvas optimization for image file
@@ -465,15 +517,6 @@ export const ProductForm = () => {
       }
     }
   };
-
-  if (loadingProduct) {
-    return (
-      <div className="max-w-5xl mx-auto py-16 text-center space-y-3">
-        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
-        <p className="text-body-sm text-on-surface-variant font-medium">Loading product specifications...</p>
-      </div>
-    );
-  }
 
   const currentPreviewImage = images[activePreviewIndex] || images[0] || sampleImages[0].url;
 

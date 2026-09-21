@@ -138,16 +138,13 @@ export const AdminProducts = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {products.map((product) => {
             const pId = product._id || product.id;
-            const totalStock = product.totalStock !== undefined
-              ? product.totalStock
-              : product.sizes?.reduce((sum, s) => sum + Number(s.stock || 0), 0) || 0;
-            const minPrice = product.minPrice !== undefined
-              ? product.minPrice
-              : product.sizes?.length > 0 ? Math.min(...product.sizes.map((s) => s.price)) : 0;
-            const maxPrice = product.maxPrice !== undefined
-              ? product.maxPrice
-              : product.sizes?.length > 0 ? Math.max(...product.sizes.map((s) => s.price)) : 0;
-
+            const s = (Array.isArray(product.sizes) && product.sizes.length > 0) ? product.sizes[0] : product;
+            const sizeDimension = product.dimension || s.dimension || (s.size ? `${s.size} cm` : (product.size ? `${product.size} cm` : '50x100 cm'));
+            const sizeGrams = product.grams || s.grams || Math.round((product.weightKg || s.weightKg || 0.3) * 1000) || 300;
+            const sizeGsm = product.gsm || s.gsm || 600;
+            const unitPrice = product.price !== undefined && product.price !== null ? Number(product.price) : Number(s.price ?? 220);
+            const unitStock = product.stock !== undefined && product.stock !== null ? Number(product.stock) : Number(s.stock ?? 0);
+            const isOutOfStock = unitStock <= 0;
             const productHsn = product.hsnCode || '6302.60';
 
             return (
@@ -166,8 +163,8 @@ export const AdminProducts = () => {
                         e.target.src = 'https://images.unsplash.com/photo-1616627547584-bf28cee262db?auto=format&fit=crop&w=600&q=80';
                       }}
                     />
-                    <div className="absolute bottom-1 right-1 bg-black/70 text-white text-[9px] px-1 py-0.2 rounded font-mono">
-                      {product.sizes?.length || 0} Sizes
+                    <div className="absolute bottom-1 right-1 bg-black/75 text-white text-[10px] px-1.5 py-0.5 rounded font-mono font-bold">
+                      {sizeDimension}
                     </div>
                   </div>
 
@@ -204,49 +201,39 @@ export const AdminProducts = () => {
                       <span className="text-outline text-xs">•</span>
                       <span className="text-on-surface-variant font-medium">{product.weaveType || '2/20s Ring'}</span>
                       <span className="text-outline text-xs">•</span>
-                      <span className="font-mono font-bold text-primary">₹{minPrice} - ₹{maxPrice}/pc</span>
+                      <span className="font-mono font-bold text-primary">₹{unitPrice}/pc</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Dynamic Sizes & Stock Availability Breakdown */}
-                <div className="p-3 bg-surface-container-low rounded-xl border border-border-subtle space-y-2">
-                  <div className="flex items-center justify-between text-label-sm font-bold text-outline uppercase tracking-wider">
-                    <span>Dynamic Sizes ({product.sizes?.length || 0})</span>
-                    <span className="text-primary font-mono">Total Stock: {totalStock} pcs</span>
-                  </div>
+                {/* Single Size Specification & Stock Details */}
+                <div className="p-3 bg-surface-container-low rounded-xl border border-border-subtle">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-body-sm">
+                    <div className="bg-surface-container-lowest p-2 rounded-lg border border-outline-variant">
+                      <span className="block text-[10px] uppercase font-bold text-on-surface-variant">Size Dimension</span>
+                      <span className="font-mono font-bold text-primary">{sizeDimension}</span>
+                    </div>
 
-                  <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
-                    {product.sizes && product.sizes.length > 0 ? (
-                      product.sizes.map((size) => (
-                        <div
-                          key={size._id || size.id}
-                          className="bg-surface-container-lowest p-2 rounded-lg border border-outline-variant flex items-center justify-between text-body-sm"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-bold text-primary">{size.size || size.dimension}</span>
-                            <span className="text-xs text-on-surface-variant font-sans">
-                              ({size.grams || Math.round((size.weightKg || 0.1) * 1000)}g)
-                            </span>
-                          </div>
+                    <div className="bg-surface-container-lowest p-2 rounded-lg border border-outline-variant">
+                      <span className="block text-[10px] uppercase font-bold text-on-surface-variant">Unit Weight</span>
+                      <span className="font-mono font-bold text-secondary">{sizeGrams}g ({sizeGsm} GSM)</span>
+                    </div>
 
-                          <div className="flex items-center gap-3 text-right">
-                            <span className="font-mono font-bold text-primary">₹{size.price}/pc</span>
-                            <span className={`font-mono text-xs font-bold px-2 py-0.5 rounded-full ${
-                              size.stock > 0
-                                ? 'bg-secondary-container text-on-secondary-container'
-                                : 'bg-error-container text-on-error-container'
-                            }`}>
-                              {size.stock} pcs
-                            </span>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-2 text-xs text-on-surface-variant font-medium">
-                        No sizes added yet. Edit product to configure dynamic dimensions.
-                      </div>
-                    )}
+                    <div className="bg-surface-container-lowest p-2 rounded-lg border border-outline-variant">
+                      <span className="block text-[10px] uppercase font-bold text-on-surface-variant">Wholesale Price</span>
+                      <span className="font-mono font-bold text-primary">₹{unitPrice} <span className="text-[10px] text-on-surface-variant font-normal">/pc</span></span>
+                    </div>
+
+                    <div className="bg-surface-container-lowest p-2 rounded-lg border border-outline-variant">
+                      <span className="block text-[10px] uppercase font-bold text-on-surface-variant">Warehouse Stock</span>
+                      <span className={`font-mono text-xs font-bold px-2 py-0.5 rounded-full inline-block mt-0.5 ${
+                        !isOutOfStock
+                          ? 'bg-secondary-container text-on-secondary-container'
+                          : 'bg-error-container text-on-error-container'
+                      }`}>
+                        {unitStock} pcs {!isOutOfStock ? 'Available' : 'Sold Out'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 

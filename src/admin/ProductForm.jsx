@@ -115,64 +115,35 @@ export const ProductForm = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [successBanner, setSuccessBanner] = useState('');
 
-  // Dynamic sizes list initialized with 1 size only for new products
-  const [sizes, setSizes] = useState(() => {
-    if (initialProduct && Array.isArray(initialProduct.sizes) && initialProduct.sizes.length > 0) {
-      return initialProduct.sizes.map((s, idx) => {
-        const dimStr = s.dimension || `${s.size} cm` || '50x100 cm';
-        const sizeKey = s.size || dimStr.replace(/cm|inch|in/gi, '').replace(/[×*X]/g, 'x').replace(/\s+/g, '').trim();
-        const g = Number(s.grams) || Math.round(Number(s.weightKg || 0.1) * 1000) || 100;
-        return {
-          id: s._id || s.id || `sz-edit-${idx}`,
-          _id: s._id || s.id || `sz-edit-${idx}`,
-          size: sizeKey,
-          dimension: dimStr,
-          price: Number(s.price) || 0,
-          stock: Number(s.stock) || 0,
-          gsm: Number(s.gsm) || 500,
-          grams: g,
-          weightKg: Number(s.weightKg) || Number((g / 1000).toFixed(3)),
-        };
-      });
+  // Single product size configuration state
+  const [sizeData, setSizeData] = useState(() => {
+    if (initialProduct) {
+      const s = (Array.isArray(initialProduct.sizes) && initialProduct.sizes.length > 0)
+        ? initialProduct.sizes[0]
+        : initialProduct;
+      const dimStr = s.dimension || (s.size ? `${s.size} cm` : '50x100 cm');
+      const sizeKey = s.size || dimStr.replace(/cm|inch|in/gi, '').replace(/[×*X]/g, 'x').replace(/\s+/g, '').trim() || '50x100';
+      const g = Number(s.grams) || Math.round(Number(s.weightKg || 0.1) * 1000) || 300;
+      return {
+        size: sizeKey,
+        dimension: dimStr,
+        price: Number(s.price ?? initialProduct.price ?? 220),
+        stock: Number(s.stock ?? initialProduct.stock ?? 350),
+        gsm: Number(s.gsm || initialProduct.gsm || 600),
+        grams: g,
+        weightKg: Number(s.weightKg) || Number((g / 1000).toFixed(3)),
+      };
     }
-    // New product creation starts with exactly ONE size card
-    return [
-      {
-        id: 'sz-init-1',
-        size: '50x100',
-        dimension: '50x100 cm',
-        widthCm: 50,
-        lengthCm: 100,
-        price: 220,
-        stock: 350,
-        gsm: 600,
-        grams: 300,
-        weightKg: 0.300,
-      },
-    ];
+    return {
+      size: '50x100',
+      dimension: '50x100 cm',
+      price: 220,
+      stock: 350,
+      gsm: 600,
+      grams: 300,
+      weightKg: 0.300,
+    };
   });
-
-  // Drawer / Subform for adding a new dynamic size
-  const [showAddSizeDrawer, setShowAddSizeDrawer] = useState(false);
-  const [newSizeForm, setNewSizeForm] = useState({
-    widthCm: 50,
-    lengthCm: 100,
-    gsm: 600,
-    grams: 300,
-    price: 220,
-    stock: 350,
-  });
-
-  const handleDimensionOrGsmChange = (field, val) => {
-    const updated = { ...newSizeForm, [field]: val };
-    const w = Number(field === 'widthCm' ? val : updated.widthCm) || 0;
-    const l = Number(field === 'lengthCm' ? val : updated.lengthCm) || 0;
-    const g = Number(field === 'gsm' ? val : updated.gsm) || 500;
-    if (w > 0 && l > 0 && g > 0) {
-      updated.grams = Math.max(10, Math.round((w * l * g) / 10000));
-    }
-    setNewSizeForm(updated);
-  };
 
   // Revalidate with latest backend data if editing
   useEffect(() => {
@@ -207,25 +178,20 @@ export const ProductForm = () => {
 
           setImages(productImages.length > 0 ? productImages : [sampleImages[0].url]);
 
-          if (Array.isArray(p.sizes) && p.sizes.length > 0) {
-            setSizes(
-              p.sizes.map((s, idx) => {
-                const dimStr = s.dimension || `${s.size} cm` || '25x50 cm';
-                const sizeKey = s.size || dimStr.replace(/cm|inch|in/gi, '').replace(/[×*X]/g, 'x').replace(/\s+/g, '').trim();
-                const g = Number(s.grams) || Math.round(Number(s.weightKg || 0.1) * 1000) || 100;
-                return {
-                  id: s._id || s.id || `sz-edit-${idx}`,
-                  _id: s._id || s.id || `sz-edit-${idx}`,
-                  size: sizeKey,
-                  dimension: dimStr,
-                  price: Number(s.price) || 0,
-                  stock: Number(s.stock) || 0,
-                  gsm: Number(s.gsm) || 500,
-                  grams: g,
-                  weightKg: Number(s.weightKg) || Number((g / 1000).toFixed(3)),
-                };
-              })
-            );
+          const s = (Array.isArray(p.sizes) && p.sizes.length > 0) ? p.sizes[0] : p;
+          if (s) {
+            const dimStr = s.dimension || (s.size ? `${s.size} cm` : '50x100 cm');
+            const sizeKey = s.size || dimStr.replace(/cm|inch|in/gi, '').replace(/[×*X]/g, 'x').replace(/\s+/g, '').trim() || '50x100';
+            const g = Number(s.grams) || Math.round(Number(s.weightKg || 0.1) * 1000) || 300;
+            setSizeData({
+              size: sizeKey,
+              dimension: dimStr,
+              price: Number(s.price ?? p.price ?? 220),
+              stock: Number(s.stock ?? p.stock ?? 350),
+              gsm: Number(s.gsm || p.gsm || 600),
+              grams: g,
+              weightKg: Number(s.weightKg) || Number((g / 1000).toFixed(3)),
+            });
           }
         }
       } catch (err) {
@@ -372,71 +338,6 @@ export const ProductForm = () => {
     setActivePreviewIndex(images.length);
   };
 
-  // Add new dynamic size row
-  const handleAddNewSizeRow = (e) => {
-    e.preventDefault();
-    const width = Number(newSizeForm.widthCm);
-    const length = Number(newSizeForm.lengthCm);
-    const gsm = Number(newSizeForm.gsm) || 500;
-    const price = Number(newSizeForm.price);
-    const stock = Number(newSizeForm.stock);
-    const grams = Number(newSizeForm.grams) || Math.max(10, Math.round((width * length * gsm) / 10000));
-    const sizeKey = `${width}x${length}`;
-
-    const isDuplicate = sizes.some((s) => {
-      const clean = String(s.size || s.dimension || '')
-        .toLowerCase()
-        .replace(/cm|inch|in/gi, '')
-        .replace(/[×*X]/g, 'x')
-        .replace(/\s+/g, '')
-        .trim();
-      return clean === sizeKey;
-    });
-
-    if (isDuplicate) {
-      alert(`⚠️ Size "${sizeKey}" (${width}x${length} cm) is already added in the list.`);
-      return;
-    }
-
-    const calculatedWeight = Number((grams / 1000).toFixed(3));
-    const newSizeItem = {
-      id: `sz-${Date.now()}`,
-      _id: `sz-${Date.now()}`,
-      size: sizeKey,
-      dimension: `${sizeKey} cm`,
-      widthCm: width,
-      lengthCm: length,
-      gsm,
-      grams,
-      price,
-      stock,
-      weightKg: calculatedWeight,
-    };
-
-    setSizes([...sizes, newSizeItem]);
-    setShowAddSizeDrawer(false);
-  };
-
-  const handleRemoveSizeRow = (sizeId) => {
-    if (sizes.length <= 1) {
-      alert('A product must have at least one dynamic size specification.');
-      return;
-    }
-    setSizes(sizes.filter((s) => s.id !== sizeId && s._id !== sizeId));
-  };
-
-  const handleUpdateSizeRow = (sizeId, fieldOrUpdates, value) => {
-    setSizes((prevSizes) =>
-      prevSizes.map((s) => {
-        if (s.id !== sizeId && s._id !== sizeId) return s;
-        if (typeof fieldOrUpdates === 'object' && fieldOrUpdates !== null) {
-          return { ...s, ...fieldOrUpdates };
-        }
-        return { ...s, [fieldOrUpdates]: value };
-      })
-    );
-  };
-
   // Form Submission
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -454,12 +355,43 @@ export const ProductForm = () => {
       return;
     }
 
-    if (sizes.length === 0) {
-      setErrorMessage('Please configure at least one dynamic size for this product.');
+    if (!sizeData.dimension || !sizeData.dimension.trim()) {
+      setErrorMessage('Please specify the towel size / dimension.');
+      return;
+    }
+
+    const priceNum = Number(sizeData.price);
+    if (isNaN(priceNum) || priceNum < 0) {
+      setErrorMessage('Please enter a valid wholesale price per piece.');
+      return;
+    }
+
+    const stockNum = Number(sizeData.stock);
+    if (isNaN(stockNum) || stockNum < 0) {
+      setErrorMessage('Please enter a valid stock quantity.');
       return;
     }
 
     setIsSubmitting(true);
+
+    const cleanDim = sizeData.dimension.trim();
+    const cleanSizeKey = sizeData.size ? sizeData.size.trim() : cleanDim.replace(/cm|inch|in/gi, '').replace(/[×*X]/g, 'x').replace(/\s+/g, '').trim() || cleanDim;
+    const gramsNum = Number(sizeData.grams) || Math.round(Number(sizeData.weightKg || 0.1) * 1000) || 300;
+    const weightKgNum = Number((gramsNum / 1000).toFixed(3));
+    const gsmNum = Number(sizeData.gsm) || 600;
+
+    const singleSizeObj = {
+      _id: `sz-${Date.now()}`,
+      id: `sz-${Date.now()}`,
+      size: cleanSizeKey,
+      dimension: cleanDim.toLowerCase().includes('cm') ? cleanDim : `${cleanDim} cm`,
+      price: priceNum,
+      stock: stockNum,
+      gsm: gsmNum,
+      grams: gramsNum,
+      weightKg: weightKgNum,
+      active: true,
+    };
 
     const payload = {
       name: formData.title.trim(),
@@ -473,21 +405,14 @@ export const ProductForm = () => {
       images: validImages,
       image: validImages[0],
       active: formData.active,
-      sizes: sizes.map((s) => {
-        const grams = Number(s.grams) || Math.round(Number(s.weightKg || 0.1) * 1000);
-        return {
-          _id: s._id || s.id,
-          id: s._id || s.id,
-          size: s.size,
-          dimension: s.dimension || `${s.size} cm`,
-          price: Number(s.price),
-          stock: Number(s.stock),
-          gsm: Number(s.gsm || 500),
-          grams,
-          weightKg: Number((grams / 1000).toFixed(3)),
-          active: true,
-        };
-      }),
+      size: cleanSizeKey,
+      dimension: singleSizeObj.dimension,
+      price: priceNum,
+      stock: stockNum,
+      gsm: gsmNum,
+      grams: gramsNum,
+      weightKg: weightKgNum,
+      sizes: [singleSizeObj],
     };
 
     let result;
@@ -1039,201 +964,217 @@ export const ProductForm = () => {
           </div>
         </section>
 
-        {/* 3. DYNAMIC SIZES & PRICING MATRIX */}
-        <section className="bg-surface-container-lowest p-5 sm:p-6 rounded-2xl border border-outline-variant shadow-sm space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-surface-container">
+        {/* 3. SINGLE SIZE SPECIFICATION, PRICING & STOCK */}
+        <section className="bg-surface-container-lowest p-5 sm:p-6 rounded-2xl border border-outline-variant shadow-sm space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-surface-container">
             <div>
-              <h2 className="text-title-md font-bold text-primary flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-secondary text-lg">straighten</span>
-                3. Dynamic Sizes, Pricing &amp; Stock Availability
+              <h2 className="text-title-md font-bold text-primary flex items-center gap-2">
+                <span className="material-symbols-outlined text-secondary text-xl">straighten</span>
+                3. Size Specification, Pricing &amp; Stock
               </h2>
               <p className="text-body-sm text-on-surface-variant">
-                Configure dynamic towel dimensions, weights in grams, wholesale prices (₹), and warehouse stock.
+                Each product card holds strictly one unique size specification, direct mill weight, wholesale price, and warehouse inventory.
+              </p>
+            </div>
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-secondary-container/30 text-secondary text-xs font-bold font-mono rounded-full border border-secondary/20">
+              <span className="material-symbols-outlined text-xs">verified</span> Single Size Consignment
+            </span>
+          </div>
+
+          {/* Quick preset dimension buttons */}
+          <div>
+            <label className="block text-label-sm font-bold text-on-surface-variant mb-1.5">
+              Quick Select Dimension or Custom Size
+            </label>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {[
+                { label: '50x100 cm (Hand / Gym)', dim: '50x100 cm', size: '50x100', g: 300, gsm: 600, price: 220 },
+                { label: '75x150 cm (Bath / Pool)', dim: '75x150 cm', size: '75x150', g: 600, gsm: 550, price: 450 },
+                { label: '70x140 cm (Standard Bath)', dim: '70x140 cm', size: '70x140', g: 500, gsm: 500, price: 380 },
+                { label: '35x50 cm (Face Towel)', dim: '35x50 cm', size: '35x50', g: 100, gsm: 550, price: 95 },
+                { label: '40x60 cm (Kitchen / Salon)', dim: '40x60 cm', size: '40x60', g: 150, gsm: 600, price: 130 },
+              ].map((preset) => {
+                const isSelected = sizeData.dimension === preset.dim || sizeData.size === preset.size;
+                return (
+                  <button
+                    key={preset.dim}
+                    type="button"
+                    onClick={() => {
+                      setSizeData((prev) => ({
+                        ...prev,
+                        dimension: preset.dim,
+                        size: preset.size,
+                        grams: prev.grams || preset.g,
+                        weightKg: Number(((prev.grams || preset.g) / 1000).toFixed(3)),
+                        gsm: prev.gsm || preset.gsm,
+                        price: prev.price || preset.price,
+                      }));
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
+                      isSelected
+                        ? 'bg-primary text-white border-primary shadow-xs'
+                        : 'bg-surface-container-low text-on-surface-variant border-outline-variant hover:bg-surface-container hover:text-primary'
+                    }`}
+                  >
+                    {preset.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Core Size Specs Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            {/* Dimension */}
+            <div>
+              <label className="block text-label-sm font-bold text-primary mb-1">
+                Size / Dimension *
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  required
+                  value={sizeData.dimension}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const cleanKey = val.replace(/cm|inch|in/gi, '').replace(/[×*X]/g, 'x').replace(/\s+/g, '').trim() || val;
+                    setSizeData({ ...sizeData, dimension: val, size: cleanKey });
+                  }}
+                  placeholder="e.g. 50x100 cm"
+                  className="w-full bg-surface-container-low border border-outline-variant rounded-xl px-3 py-2.5 text-body-md font-bold text-primary focus:border-primary focus:bg-surface-container-lowest outline-none transition-all"
+                />
+                <span className="absolute right-3 top-2.5 text-xs font-bold text-on-surface-variant/60 pointer-events-none">
+                  cm
+                </span>
+              </div>
+              <p className="text-[11px] text-on-surface-variant mt-1">Width × Length (e.g. 50x100 cm)</p>
+            </div>
+
+            {/* Weight in Grams */}
+            <div>
+              <label className="block text-label-sm font-bold text-primary mb-1">
+                Weight (Grams / pc) *
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  required
+                  min={1}
+                  value={sizeData.grams}
+                  onChange={(e) => {
+                    const g = e.target.value === '' ? '' : Number(e.target.value);
+                    setSizeData({
+                      ...sizeData,
+                      grams: g,
+                      weightKg: typeof g === 'number' ? Number((g / 1000).toFixed(3)) : 0,
+                    });
+                  }}
+                  placeholder="300"
+                  className="w-full bg-surface-container-low border border-outline-variant rounded-xl px-3 py-2.5 text-body-md font-mono font-bold text-secondary focus:border-secondary focus:bg-surface-container-lowest outline-none transition-all"
+                />
+                <span className="absolute right-3 top-2.5 text-xs font-bold text-secondary pointer-events-none">
+                  g
+                </span>
+              </div>
+              <p className="text-[11px] text-on-surface-variant mt-1">
+                = {(Number(sizeData.grams || 0) / 1000).toFixed(3)} kg / piece
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setShowAddSizeDrawer(!showAddSizeDrawer)}
-              className="bg-primary-container text-white px-3.5 py-1.5 rounded-lg text-label-md font-bold hover:bg-primary transition-colors flex items-center gap-1 shadow-sm active:scale-95 cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-base">add</span>
-              <span>{showAddSizeDrawer ? 'Close Form' : 'Add Dynamic Size'}</span>
-            </button>
+            {/* GSM */}
+            <div>
+              <label className="block text-label-sm font-bold text-primary mb-1">
+                Fabric GSM *
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  required
+                  min={100}
+                  max={1200}
+                  value={sizeData.gsm}
+                  onChange={(e) => setSizeData({ ...sizeData, gsm: Number(e.target.value) })}
+                  placeholder="600"
+                  className="w-full bg-surface-container-low border border-outline-variant rounded-xl px-3 py-2.5 text-body-md font-mono font-bold text-primary focus:border-primary focus:bg-surface-container-lowest outline-none transition-all"
+                />
+                <span className="absolute right-3 top-2.5 text-xs font-bold text-on-surface-variant pointer-events-none">
+                  GSM
+                </span>
+              </div>
+              <p className="text-[11px] text-on-surface-variant mt-1">Density grams / m²</p>
+            </div>
+
+            {/* Wholesale Price */}
+            <div>
+              <label className="block text-label-sm font-bold text-primary mb-1">
+                Wholesale Price (₹) *
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-2.5 text-sm font-bold text-primary pointer-events-none">
+                  ₹
+                </span>
+                <input
+                  type="number"
+                  required
+                  min={0}
+                  value={sizeData.price}
+                  onChange={(e) => setSizeData({ ...sizeData, price: Number(e.target.value) })}
+                  placeholder="220"
+                  className="w-full bg-surface-container-low border border-outline-variant rounded-xl pl-7 pr-3 py-2.5 text-body-md font-mono font-bold text-primary focus:border-primary focus:bg-surface-container-lowest outline-none transition-all"
+                />
+              </div>
+              <p className="text-[11px] text-on-surface-variant mt-1">Per piece (ex-mill)</p>
+            </div>
+
+            {/* Stock */}
+            <div>
+              <label className="block text-label-sm font-bold text-primary mb-1">
+                Warehouse Stock (pcs) *
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  required
+                  min={0}
+                  value={sizeData.stock}
+                  onChange={(e) => setSizeData({ ...sizeData, stock: Number(e.target.value) })}
+                  placeholder="350"
+                  className="w-full bg-surface-container-low border border-outline-variant rounded-xl px-3 py-2.5 text-body-md font-mono font-bold text-primary focus:border-primary focus:bg-surface-container-lowest outline-none transition-all"
+                />
+                <span className="absolute right-3 top-2.5 text-xs font-bold text-on-surface-variant pointer-events-none">
+                  pcs
+                </span>
+              </div>
+              <p className="text-[11px] text-on-surface-variant mt-1">Available inventory</p>
+            </div>
           </div>
 
-          {/* Add Size Drawer */}
-          {showAddSizeDrawer && (
-            <div className="bg-surface-container-low p-4 rounded-xl border-2 border-primary/20 space-y-3">
-              <div className="flex items-center justify-between border-b border-outline-variant pb-2">
-                <span className="font-bold text-primary text-label-md uppercase tracking-wide flex items-center gap-1">
-                  <span className="material-symbols-outlined text-sm">add_circle</span>
-                  New Dynamic Size (Free-form cm)
-                </span>
-                <span className="text-label-sm text-secondary font-bold font-mono">Direct Mill Specs</span>
+          {/* Unit Spec Live Preview Card */}
+          <div className="bg-surface-container-low/80 border border-outline-variant rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-primary text-white flex items-center justify-center font-bold font-mono text-sm">
+                1x
               </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                <div>
-                  <label className="block text-label-sm font-bold text-on-surface-variant mb-1">
-                    Width (cm) *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min={10}
-                    max={300}
-                    value={newSizeForm.widthCm}
-                    onChange={(e) => handleDimensionOrGsmChange('widthCm', e.target.value)}
-                    className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-2.5 py-1.5 font-mono text-body-sm text-primary"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-label-sm font-bold text-on-surface-variant mb-1">
-                    Length (cm) *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min={10}
-                    max={400}
-                    value={newSizeForm.lengthCm}
-                    onChange={(e) => handleDimensionOrGsmChange('lengthCm', e.target.value)}
-                    className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-2.5 py-1.5 font-mono text-body-sm text-primary"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-label-sm font-bold text-on-surface-variant mb-1">
-                    Weight (Grams) *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min={1}
-                    value={newSizeForm.grams}
-                    onChange={(e) => setNewSizeForm({ ...newSizeForm, grams: e.target.value })}
-                    className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-2.5 py-1.5 font-mono text-body-sm text-primary font-bold"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-label-sm font-bold text-on-surface-variant mb-1">
-                    Price (₹ / pc) *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min={0}
-                    value={newSizeForm.price}
-                    onChange={(e) => setNewSizeForm({ ...newSizeForm, price: e.target.value })}
-                    className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-2.5 py-1.5 font-mono text-body-sm text-primary font-bold"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-label-sm font-bold text-on-surface-variant mb-1">
-                    Stock (pcs) *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min={0}
-                    value={newSizeForm.stock}
-                    onChange={(e) => setNewSizeForm({ ...newSizeForm, stock: e.target.value })}
-                    className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-2.5 py-1.5 font-mono text-body-sm text-primary font-bold"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-2 flex justify-end">
-                <button
-                  type="button"
-                  onClick={handleAddNewSizeRow}
-                  className="px-4 py-2 bg-primary text-white text-label-md font-bold rounded-lg shadow-sm hover:bg-primary-container active:scale-95 transition-all cursor-pointer"
-                >
-                  Insert Size ({newSizeForm.widthCm}x{newSizeForm.lengthCm} • {newSizeForm.grams}g)
-                </button>
+              <div>
+                <p className="text-body-sm font-bold text-primary">
+                  {formData.title || 'Product'} • {sizeData.dimension || '50x100 cm'}
+                </p>
+                <p className="text-xs text-on-surface-variant">
+                  {sizeData.grams}g weight • {sizeData.gsm} GSM • {formData.weaveType} • {formData.material}
+                </p>
               </div>
             </div>
-          )}
 
-          {/* Sizes Table */}
-          <div className="overflow-x-auto border border-outline-variant rounded-xl bg-surface-container-lowest">
-            <table className="w-full text-left text-body-sm">
-              <thead className="bg-surface-container-low border-b border-outline-variant text-label-sm font-bold uppercase text-on-surface-variant">
-                <tr>
-                  <th className="p-3">Size Dimension</th>
-                  <th className="p-3">Weight (Grams)</th>
-                  <th className="p-3">Price (₹ / pc)</th>
-                  <th className="p-3">Warehouse Stock (pcs)</th>
-                  <th className="p-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-subtle font-mono">
-                {sizes.map((size) => (
-                  <tr key={size.id || size._id} className="hover:bg-surface-container-low/40">
-                    <td className="p-3 font-bold text-primary font-sans">
-                      {size.dimension || `${size.size} cm`}
-                    </td>
-                    <td className="p-3">
-                      <div className="flex items-center gap-1">
-                        <input
-                          type="number"
-                          min={1}
-                          value={size.grams !== undefined && size.grams !== null ? size.grams : Math.round((size.weightKg || 0.1) * 1000)}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            const g = val === '' ? '' : Number(val);
-                            handleUpdateSizeRow(size.id || size._id, {
-                              grams: g,
-                              weightKg: typeof g === 'number' ? Number((g / 1000).toFixed(3)) : 0,
-                            });
-                          }}
-                          className="w-20 bg-surface-container-low border border-outline-variant rounded px-2 py-1 text-xs font-mono font-bold text-secondary"
-                        />
-                        <span className="text-xs font-bold text-on-surface-variant font-sans">g</span>
-                      </div>
-                    </td>
-                    <td className="p-3">
-                      <div className="flex items-center gap-1">
-                        <span>₹</span>
-                        <input
-                          type="number"
-                          min={0}
-                          value={size.price}
-                          onChange={(e) => handleUpdateSizeRow(size.id || size._id, 'price', Number(e.target.value))}
-                          className="w-24 bg-surface-container-low border border-outline-variant rounded px-2 py-1 text-xs font-mono font-bold text-primary"
-                        />
-                      </div>
-                    </td>
-                    <td className="p-3">
-                      <div className="flex items-center gap-1">
-                        <input
-                          type="number"
-                          min={0}
-                          value={size.stock}
-                          onChange={(e) => handleUpdateSizeRow(size.id || size._id, 'stock', Number(e.target.value))}
-                          className="w-24 bg-surface-container-low border border-outline-variant rounded px-2 py-1 text-xs font-mono font-bold"
-                        />
-                        <span className="text-xs text-on-surface-variant font-sans">pcs</span>
-                      </div>
-                    </td>
-                    <td className="p-3 text-right font-sans">
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveSizeRow(size.id || size._id)}
-                        className="p-1.5 text-error hover:bg-error-container/40 rounded-lg transition-colors cursor-pointer"
-                        title="Remove Size"
-                      >
-                        <span className="material-symbols-outlined text-lg">delete</span>
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="flex items-center gap-4 text-right">
+              <div>
+                <p className="text-xs text-on-surface-variant uppercase font-bold tracking-wider">Unit Price</p>
+                <p className="text-title-sm font-bold text-primary font-mono">₹{sizeData.price || 0} <span className="text-xs font-normal text-on-surface-variant">/pc</span></p>
+              </div>
+              <div className="border-l border-outline-variant pl-4">
+                <p className="text-xs text-on-surface-variant uppercase font-bold tracking-wider">Inventory Value</p>
+                <p className="text-title-sm font-bold text-secondary font-mono">₹{((Number(sizeData.price) || 0) * (Number(sizeData.stock) || 0)).toLocaleString('en-IN')}</p>
+              </div>
+            </div>
           </div>
         </section>
 

@@ -9,11 +9,13 @@ export const ProductCard = ({ product, selectedDimension, onSelectDimension }) =
   const [cardImgIndex, setCardImgIndex] = useState(0);
 
   if (!product) return null;
-  const sizes = product.sizes || [];
-  const validPrices = sizes.map((s) => s.price ?? s.pricePerPiece).filter((p) => typeof p === 'number' && !isNaN(p));
-  const minPrice = validPrices.length > 0 ? Math.min(...validPrices) : (product.minPrice || 0);
-  const maxPrice = validPrices.length > 0 ? Math.max(...validPrices) : (product.maxPrice || 0);
-  const totalStock = sizes.length > 0 ? sizes.reduce((sum, s) => sum + (Number(s.stock) || 0), 0) : (product.totalStock || 0);
+  const s = (Array.isArray(product.sizes) && product.sizes.length > 0) ? product.sizes[0] : product;
+  const sizeDimension = product.dimension || s.dimension || (s.size ? `${s.size} cm` : (product.size ? `${product.size} cm` : '50x100 cm'));
+  const sizeGrams = product.grams || s.grams || Math.round((product.weightKg || s.weightKg || 0.3) * 1000) || 300;
+  const sizeGsm = product.gsm || s.gsm || 600;
+  const unitPrice = product.price !== undefined && product.price !== null ? Number(product.price) : Number(s.price ?? 220);
+  const unitStock = product.stock !== undefined && product.stock !== null ? Number(product.stock) : Number(s.stock ?? (product.totalStock ?? 0));
+  const isOutOfStock = unitStock <= 0;
 
   const productId = product.id || product._id;
   const productTitle = product.title || product.name || 'White Towel';
@@ -26,20 +28,10 @@ export const ProductCard = ({ product, selectedDimension, onSelectDimension }) =
   const rawMaterial = product.material || 'Cotton';
   const productMaterial = /cotton/i.test(rawMaterial) ? 'Cotton' : rawMaterial;
   const productSubtitle = product.subtitle || product.description || 'Premium institutional grade white terry towel for commercial use.';
-  const productStatus = product.status && !product.status.toLowerCase().includes('out of stock')
-    ? product.status
-    : 'READY TO DISPATCH';
+  const productStatus = isOutOfStock
+    ? 'OUT OF STOCK'
+    : (product.status && !product.status.toLowerCase().includes('out of stock') ? product.status : 'READY TO DISPATCH');
   const weaveDisplay = product.weaveType ? product.weaveType.split(' ')[0] : '20s';
-
-  // Check if a specific dimension is currently selected/filtered
-  const normalizedSelected = (selectedDimension || '').replace(/[×X*]/g, 'x').replace(/\s+/g, '').toLowerCase();
-  const matchedSize = normalizedSelected
-    ? sizes.find((s) => {
-        const sDim = (s.dimension || s.size || '').replace(/[×X*]/g, 'x').replace(/\s+/g, '').toLowerCase();
-        const sId = (s.id || s._id || '').toLowerCase();
-        return sDim.includes(normalizedSelected) || sId.includes(normalizedSelected);
-      })
-    : null;
 
   const handleImageClick = (e) => {
     e.preventDefault();
@@ -99,8 +91,8 @@ export const ProductCard = ({ product, selectedDimension, onSelectDimension }) =
 
             {/* Live Inventory Badge */}
             <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 bg-white/95 backdrop-blur-sm px-2.5 py-0.5 rounded-full border border-outline-variant shadow-xs">
-              <span className="w-2 h-2 rounded-full bg-secondary pulse-live"></span>
-              <span className="font-label-sm text-label-sm font-bold uppercase text-secondary">
+              <span className={`w-2 h-2 rounded-full ${isOutOfStock ? 'bg-error' : 'bg-secondary pulse-live'}`}></span>
+              <span className={`font-label-sm text-label-sm font-bold uppercase ${isOutOfStock ? 'text-error' : 'text-secondary'}`}>
                 {productStatus}
               </span>
             </div>
@@ -126,56 +118,15 @@ export const ProductCard = ({ product, selectedDimension, onSelectDimension }) =
             </p>
           </div>
 
-          {/* Filtered Dimension Card Banner if specific size selected */}
-          {matchedSize && (
-            <div className="bg-[#E6F5F0] border border-secondary-fixed p-2.5 rounded-xl flex items-center justify-between animate-in fade-in duration-150">
-              <div>
-                <span className="text-[10px] text-secondary font-bold uppercase tracking-wider block">Matching Dimension:</span>
-                <span className="font-bold text-primary text-body-sm">{matchedSize.dimension || `${matchedSize.size} cm`}</span>
-                {matchedSize.inches && (
-                  <span className="text-[11px] text-on-surface-variant font-medium ml-1">({matchedSize.inches})</span>
-                )}
-              </div>
-              <div className="text-right">
-                <span className="font-bold text-primary font-mono text-body-md block">₹{matchedSize.price}/pc</span>
-                <span className="text-[10px] text-secondary font-bold uppercase">MOQ: {matchedSize.moq || 40} pcs</span>
-              </div>
+          {/* Single Size Specification Highlight Card */}
+          <div className="bg-surface-container-low p-2.5 rounded-xl border border-outline-variant flex items-center justify-between">
+            <div>
+              <span className="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider block">Size Dimension</span>
+              <span className="font-bold text-primary text-body-md font-mono">{sizeDimension}</span>
             </div>
-          )}
-
-          {/* Dynamic Sizes Available Pills */}
-          <div className="space-y-1.5 pt-1">
-            <div className="flex items-center justify-between">
-              <span className="text-label-sm font-label-sm text-outline font-bold uppercase tracking-wider block">
-                Configurable Sizes ({sizes.length}):
-              </span>
-              <span className="text-[11px] text-outline font-medium">Click size to preview</span>
-            </div>
-
-            <div className="flex flex-wrap gap-1.5">
-              {sizes.map((size, idx) => {
-                const sDim = (size.dimension || size.size || '').replace(/[×X*]/g, 'x').replace(/\s+/g, '').toLowerCase();
-                const isSelected = normalizedSelected && sDim.includes(normalizedSelected);
-
-                return (
-                  <button
-                    key={size.id || size._id || idx}
-                    type="button"
-                    onClick={() => onSelectDimension && onSelectDimension(size.dimension || `${size.size} cm`)}
-                    className={`px-2.5 py-1 rounded-lg text-label-sm font-medium transition-all flex items-center gap-1.5 border cursor-pointer ${
-                      isSelected
-                        ? 'bg-primary text-white border-primary shadow-xs font-bold ring-1 ring-primary/40'
-                        : 'bg-surface-container-low border-border-subtle text-primary hover:border-primary/40'
-                    }`}
-                    title={`Click to filter ${size.dimension || size.size} cm (₹${size.price}/pc)`}
-                  >
-                    <span>{size.dimension || `${size.size} cm`}</span>
-                    <span className={`font-mono font-bold ${isSelected ? 'text-secondary-fixed' : 'text-secondary'}`}>
-                      ₹{size.price}
-                    </span>
-                  </button>
-                );
-              })}
+            <div className="text-right">
+              <span className="text-[10px] text-secondary font-bold uppercase tracking-wider block">Unit Weight</span>
+              <span className="font-bold text-secondary font-mono text-body-sm">{sizeGrams}g ({sizeGsm} GSM)</span>
             </div>
           </div>
 
@@ -191,7 +142,9 @@ export const ProductCard = ({ product, selectedDimension, onSelectDimension }) =
             </div>
             <div className="bg-surface-container-low p-1.5 rounded text-center border border-border-subtle">
               <span className="block font-label-sm text-label-sm text-outline">STOCK</span>
-              <span className="font-title-md text-title-md text-secondary font-bold">{totalStock} pcs</span>
+              <span className={`font-title-md text-title-md font-bold ${isOutOfStock ? 'text-error' : 'text-secondary'}`}>
+                {unitStock} pcs
+              </span>
             </div>
           </div>
         </div>
@@ -200,25 +153,18 @@ export const ProductCard = ({ product, selectedDimension, onSelectDimension }) =
         <div className="pt-4 mt-3 border-t border-border-subtle flex items-center justify-between">
           <div>
             <span className="text-label-sm text-outline block">
-              {matchedSize ? `Rate (${matchedSize.dimension}):` : 'Wholesale Range:'}
+              Wholesale Rate:
             </span>
             <span className="text-title-md font-bold text-primary font-mono">
-              {matchedSize ? (
-                <>₹{matchedSize.price}<span className="text-label-sm text-outline font-normal">/pc</span></>
-              ) : minPrice === maxPrice ? (
-                `₹${minPrice}`
-              ) : (
-                `₹${minPrice} - ₹${maxPrice}`
-              )}
-              {!matchedSize && <span className="text-label-sm text-outline font-normal">/pc</span>}
+              ₹{unitPrice}<span className="text-label-sm text-outline font-normal">/pc</span>
             </span>
           </div>
 
           <Link
-            to={matchedSize ? `/products/${productId}?size=${matchedSize.id || matchedSize._id}` : `/products/${productId}`}
+            to={`/products/${productId}`}
             className="bg-primary-container hover:bg-primary text-white px-3.5 py-2 rounded-lg font-label-md font-bold flex items-center gap-1 active:scale-95 transition-all shadow-sm"
           >
-            <span>{matchedSize ? `Order ${matchedSize.dimension}` : 'Configure Order'}</span>
+            <span>Order Now</span>
             <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
           </Link>
         </div>

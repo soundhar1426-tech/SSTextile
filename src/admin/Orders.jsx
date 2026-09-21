@@ -592,10 +592,10 @@ export const AdminOrders = () => {
 
       {/* Comprehensive Bill Verification & Confirmation Modal */}
       {selectedOrderForBillCheck && billCheckForm && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant p-6 max-w-3xl w-full shadow-2xl space-y-5 my-6 animate-in fade-in zoom-in-95">
-            {/* Modal Header */}
-            <div className="flex justify-between items-start pb-3 border-b border-surface-container">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 overflow-hidden">
+          <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant max-w-3xl w-full shadow-2xl flex flex-col max-h-[92vh] sm:max-h-[88vh] animate-in fade-in zoom-in-95 overflow-hidden">
+            {/* Modal Header (Fixed at top) */}
+            <div className="flex justify-between items-start p-4 sm:p-5 border-b border-surface-container shrink-0 bg-surface-container-lowest">
               <div>
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-secondary text-2xl">fact_check</span>
@@ -613,162 +613,165 @@ export const AdminOrders = () => {
                   setSelectedOrderForBillCheck(null);
                   setBillCheckForm(null);
                 }}
-                className="p-1 text-on-surface-variant hover:text-primary rounded-lg cursor-pointer"
+                className="p-1 text-on-surface-variant hover:text-primary rounded-lg cursor-pointer transition-colors"
               >
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
 
-            <form onSubmit={handleConfirmBillAndGenerateInvoice} className="space-y-4">
-              {/* Buyer & Consignment Info Banner */}
-              <div className="p-4 bg-surface-container-low rounded-xl border border-outline-variant grid grid-cols-1 sm:grid-cols-2 gap-3 text-body-sm">
-                <div>
-                  <span className="text-[11px] font-bold text-outline uppercase block mb-0.5">Buyer / Consignee:</span>
-                  <p className="font-bold text-primary">{billCheckForm.businessName || billCheckForm.customerName}</p>
-                  <p className="text-xs text-on-surface-variant">Phone: {billCheckForm.phone} • Email: {billCheckForm.email}</p>
-                  <p className="text-xs text-on-surface-variant">
-                    GSTIN: <span className="font-mono font-bold text-primary">{billCheckForm.gstin || 'Unregistered'}</span>
-                  </p>
-                </div>
-
-                <div>
-                  <span className="text-[11px] font-bold text-outline uppercase block mb-0.5">Logistics &amp; Destination:</span>
-                  <p className="text-xs text-primary font-medium">{billCheckForm.address}, {billCheckForm.city}, {billCheckForm.state}</p>
-                  <p className="text-xs text-on-surface-variant mt-0.5">
-                    Carrier: <strong className="text-primary">{billCheckForm.transporter}</strong>
-                  </p>
-                  <p className="text-xs text-on-surface-variant">
-                    Place of Supply: <strong className="text-primary">{billCheckForm.state} ({billCheckForm.stateCode})</strong>
-                  </p>
-                </div>
-              </div>
-
-              {/* Itemized Table Breakdown */}
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-label-sm font-bold text-outline uppercase">
-                    Consignment Items &amp; Rates (Verified for GST Invoice)
-                  </span>
-                  <span className="text-xs text-secondary font-bold font-mono bg-secondary-fixed/40 px-2 py-0.5 rounded">
-                    HSN 6302.60 • 5% GST
-                  </span>
-                </div>
-
-                <div className="border border-outline-variant rounded-xl overflow-hidden">
-                  <table className="w-full text-body-sm text-left">
-                    <thead className="bg-surface-container text-label-sm text-primary font-bold">
-                      <tr>
-                        <th className="p-2.5">Product &amp; Size</th>
-                        <th className="p-2.5 text-center">Qty (Pcs)</th>
-                        <th className="p-2.5 text-right">Rate (₹)</th>
-                        <th className="p-2.5 text-right">Subtotal (₹)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-outline-variant bg-surface-container-lowest">
-                      {billCheckForm.items?.map((item, idx) => (
-                        <tr key={idx} className="hover:bg-surface-container-low">
-                          <td className="p-2.5">
-                            <span className="font-bold text-primary block">{item.productName}</span>
-                            <span className="text-xs text-on-surface-variant">Size: {item.size} • HSN: {item.hsnCode}</span>
-                          </td>
-                          <td className="p-2.5 text-center font-mono">
-                            <input
-                              type="number"
-                              min="1"
-                              value={item.quantity}
-                              onChange={(e) => handleBillItemChange(idx, 'quantity', e.target.value)}
-                              className="w-20 text-center font-bold bg-surface-container border border-outline-variant rounded px-2 py-1 outline-none focus:border-primary"
-                            />
-                          </td>
-                          <td className="p-2.5 text-right font-mono">
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={item.price}
-                              onChange={(e) => handleBillItemChange(idx, 'price', e.target.value)}
-                              className="w-24 text-right font-bold bg-surface-container border border-outline-variant rounded px-2 py-1 outline-none focus:border-primary"
-                            />
-                          </td>
-                          <td className="p-2.5 text-right font-mono font-bold text-primary">
-                            ₹{(item.subtotal || item.quantity * item.price).toLocaleString('en-IN')}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Financial Totals Breakdown */}
-              <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant space-y-1.5 text-body-sm">
-                <div className="flex justify-between text-on-surface-variant">
-                  <span>Gross Subtotal:</span>
-                  <span className="font-mono font-medium">₹{Number(billCheckForm.subtotal || 0).toLocaleString('en-IN')}.00</span>
-                </div>
-                {Number(billCheckForm.discount || 0) > 0 && (
-                  <div className="flex justify-between text-secondary">
-                    <span>Wholesale Rebate / Discount:</span>
-                    <span className="font-mono font-medium">- ₹{Number(billCheckForm.discount).toLocaleString('en-IN')}.00</span>
+            <form onSubmit={handleConfirmBillAndGenerateInvoice} className="flex flex-col flex-1 overflow-hidden min-h-0">
+              {/* Scrollable Middle Body */}
+              <div className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1 custom-scrollbar">
+                {/* Buyer & Consignment Info Banner */}
+                <div className="p-4 bg-surface-container-low rounded-xl border border-outline-variant grid grid-cols-1 sm:grid-cols-2 gap-3 text-body-sm">
+                  <div>
+                    <span className="text-[11px] font-bold text-outline uppercase block mb-0.5">Buyer / Consignee:</span>
+                    <p className="font-bold text-primary">{billCheckForm.businessName || billCheckForm.customerName}</p>
+                    <p className="text-xs text-on-surface-variant">Phone: {billCheckForm.phone} • Email: {billCheckForm.email}</p>
+                    <p className="text-xs text-on-surface-variant">
+                      GSTIN: <span className="font-mono font-bold text-primary">{billCheckForm.gstin || 'Unregistered'}</span>
+                    </p>
                   </div>
-                )}
-                <div className="flex justify-between text-on-surface-variant">
-                  <span>GST (5% Intra/Inter State):</span>
-                  <span className="font-mono font-medium">+ ₹{Number(billCheckForm.tax || 0).toLocaleString('en-IN')}.00</span>
+
+                  <div>
+                    <span className="text-[11px] font-bold text-outline uppercase block mb-0.5">Logistics &amp; Destination:</span>
+                    <p className="text-xs text-primary font-medium">{billCheckForm.address}, {billCheckForm.city}, {billCheckForm.state}</p>
+                    <p className="text-xs text-on-surface-variant mt-0.5">
+                      Carrier: <strong className="text-primary">{billCheckForm.transporter}</strong>
+                    </p>
+                    <p className="text-xs text-on-surface-variant">
+                      Place of Supply: <strong className="text-primary">{billCheckForm.state} ({billCheckForm.stateCode})</strong>
+                    </p>
+                  </div>
                 </div>
-                <div className="flex justify-between text-primary font-bold text-title-md border-t border-surface-container pt-2 mt-1">
-                  <span>Grand Total Net Payable:</span>
-                  <span className="font-mono text-secondary text-headline-sm">
-                    ₹{Number(billCheckForm.totalAmount || 0).toLocaleString('en-IN')}.00
-                  </span>
+
+                {/* Itemized Table Breakdown */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-label-sm font-bold text-outline uppercase">
+                      Consignment Items &amp; Rates (Verified for GST Invoice)
+                    </span>
+                    <span className="text-xs text-secondary font-bold font-mono bg-secondary-fixed/40 px-2 py-0.5 rounded">
+                      HSN 6302.60 • 5% GST
+                    </span>
+                  </div>
+
+                  <div className="border border-outline-variant rounded-xl overflow-hidden">
+                    <table className="w-full text-body-sm text-left">
+                      <thead className="bg-surface-container text-label-sm text-primary font-bold">
+                        <tr>
+                          <th className="p-2.5">Product &amp; Size</th>
+                          <th className="p-2.5 text-center">Qty (Pcs)</th>
+                          <th className="p-2.5 text-right">Rate (₹)</th>
+                          <th className="p-2.5 text-right">Subtotal (₹)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-outline-variant bg-surface-container-lowest">
+                        {billCheckForm.items?.map((item, idx) => (
+                          <tr key={idx} className="hover:bg-surface-container-low">
+                            <td className="p-2.5">
+                              <span className="font-bold text-primary block">{item.productName}</span>
+                              <span className="text-xs text-on-surface-variant">Size: {item.size} • HSN: {item.hsnCode}</span>
+                            </td>
+                            <td className="p-2.5 text-center font-mono">
+                              <input
+                                type="number"
+                                min="1"
+                                value={item.quantity}
+                                onChange={(e) => handleBillItemChange(idx, 'quantity', e.target.value)}
+                                className="w-20 text-center font-bold bg-surface-container border border-outline-variant rounded px-2 py-1 outline-none focus:border-primary"
+                              />
+                            </td>
+                            <td className="p-2.5 text-right font-mono">
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={item.price}
+                                onChange={(e) => handleBillItemChange(idx, 'price', e.target.value)}
+                                className="w-24 text-right font-bold bg-surface-container border border-outline-variant rounded px-2 py-1 outline-none focus:border-primary"
+                              />
+                            </td>
+                            <td className="p-2.5 text-right font-mono font-bold text-primary">
+                              ₹{(item.subtotal || item.quantity * item.price).toLocaleString('en-IN')}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Financial Totals Breakdown */}
+                <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant space-y-1.5 text-body-sm">
+                  <div className="flex justify-between text-on-surface-variant">
+                    <span>Gross Subtotal:</span>
+                    <span className="font-mono font-medium">₹{Number(billCheckForm.subtotal || 0).toLocaleString('en-IN')}.00</span>
+                  </div>
+                  {Number(billCheckForm.discount || 0) > 0 && (
+                    <div className="flex justify-between text-secondary">
+                      <span>Wholesale Rebate / Discount:</span>
+                      <span className="font-mono font-medium">- ₹{Number(billCheckForm.discount).toLocaleString('en-IN')}.00</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-on-surface-variant">
+                    <span>GST (5% Intra/Inter State):</span>
+                    <span className="font-mono font-medium">+ ₹{Number(billCheckForm.tax || 0).toLocaleString('en-IN')}.00</span>
+                  </div>
+                  <div className="flex justify-between text-primary font-bold text-title-md border-t border-surface-container pt-2 mt-1">
+                    <span>Grand Total Net Payable:</span>
+                    <span className="font-mono text-secondary text-headline-sm">
+                      ₹{Number(billCheckForm.totalAmount || 0).toLocaleString('en-IN')}.00
+                    </span>
+                  </div>
+                </div>
+
+                {/* Payment Settlement Information */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="block font-label-md text-on-surface-variant mb-1 font-semibold">
+                      Payment Method Received
+                    </label>
+                    <select
+                      value={billCheckForm.paymentMethod}
+                      onChange={(e) => setBillCheckForm({ ...billCheckForm, paymentMethod: e.target.value })}
+                      className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-body-md text-primary outline-none focus:ring-1 focus:ring-primary"
+                    >
+                      <option value="UPI">UPI (GPay / PhonePe / Paytm / BHIM)</option>
+                      <option value="Bank Transfer">Bank Transfer (RTGS / NEFT / IMPS)</option>
+                      <option value="Cash">Cash (Ex-Mill Settlement)</option>
+                      <option value="Other">Other Wholesale Account</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-label-md text-on-surface-variant mb-1 font-semibold">
+                      Bank Reference / UTR Number (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. UTR-982347102938"
+                      value={billCheckForm.paymentReference}
+                      onChange={(e) => setBillCheckForm({ ...billCheckForm, paymentReference: e.target.value })}
+                      className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-body-md text-primary font-mono outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                </div>
+
+                {/* Automated Invoicing Guarantee Note */}
+                <div className="p-3 bg-[#E6F5F0] rounded-xl border border-secondary-fixed text-xs text-secondary flex items-start gap-2">
+                  <span className="material-symbols-outlined text-base mt-0.5 shrink-0">verified</span>
+                  <div>
+                    <p className="font-bold">Automated GST Tax Invoice Issuance:</p>
+                    <p>
+                      Clicking <strong>Confirm Bill &amp; Generate GST Invoice</strong> marks the order as <strong>Confirmed &amp; Paid</strong>, automatically produces the official GST Tax Invoice with SSTextiles details, and makes it instantly accessible in the buyer portal.
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              {/* Payment Settlement Information */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                <div>
-                  <label className="block font-label-md text-on-surface-variant mb-1 font-semibold">
-                    Payment Method Received
-                  </label>
-                  <select
-                    value={billCheckForm.paymentMethod}
-                    onChange={(e) => setBillCheckForm({ ...billCheckForm, paymentMethod: e.target.value })}
-                    className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-body-md text-primary outline-none focus:ring-1 focus:ring-primary"
-                  >
-                    <option value="UPI">UPI (GPay / PhonePe / Paytm / BHIM)</option>
-                    <option value="Bank Transfer">Bank Transfer (RTGS / NEFT / IMPS)</option>
-                    <option value="Cash">Cash (Ex-Mill Settlement)</option>
-                    <option value="Other">Other Wholesale Account</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-label-md text-on-surface-variant mb-1 font-semibold">
-                    Bank Reference / UTR Number (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. UTR-982347102938"
-                    value={billCheckForm.paymentReference}
-                    onChange={(e) => setBillCheckForm({ ...billCheckForm, paymentReference: e.target.value })}
-                    className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-body-md text-primary font-mono outline-none focus:ring-1 focus:ring-primary"
-                  />
-                </div>
-              </div>
-
-              {/* Automated Invoicing Guarantee Note */}
-              <div className="p-3 bg-[#E6F5F0] rounded-xl border border-secondary-fixed text-xs text-secondary flex items-start gap-2">
-                <span className="material-symbols-outlined text-base mt-0.5 shrink-0">verified</span>
-                <div>
-                  <p className="font-bold">Automated GST Tax Invoice Issuance:</p>
-                  <p>
-                    Clicking <strong>Confirm Bill &amp; Generate GST Invoice</strong> marks the order as <strong>Confirmed &amp; Paid</strong>, automatically produces the official GST Tax Invoice with SSTextiles details, and makes it instantly accessible in the buyer portal.
-                  </p>
-                </div>
-              </div>
-
-              {/* Modal Action Buttons */}
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+              {/* Modal Action Buttons (Fixed / Sticky at bottom) */}
+              <div className="p-3 sm:p-4 bg-surface-container-low border-t border-surface-container shrink-0 flex flex-wrap items-center justify-between gap-3">
                 <Link
                   to={`/invoice/${selectedOrderForBillCheck._id || selectedOrderForBillCheck.orderNumber || selectedOrderForBillCheck.id}`}
                   target="_blank"
@@ -793,7 +796,7 @@ export const AdminOrders = () => {
                   <button
                     type="submit"
                     disabled={isConfirmingBill}
-                    className="px-5 py-2.5 rounded-lg bg-secondary hover:bg-secondary/90 text-white font-bold text-label-md shadow-md flex items-center gap-2 cursor-pointer transition-all disabled:opacity-50"
+                    className="px-5 py-2.5 rounded-lg bg-secondary hover:bg-secondary/90 text-white font-bold text-label-md shadow-md flex items-center gap-2 cursor-pointer transition-all disabled:opacity-50 active:scale-95"
                   >
                     {isConfirmingBill ? (
                       <span>Generating Invoice...</span>
@@ -813,9 +816,10 @@ export const AdminOrders = () => {
 
       {/* Admin Order Details View Modal */}
       {selectedOrderForDetails && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant p-6 max-w-2xl w-full shadow-2xl space-y-5 my-8 animate-in fade-in zoom-in-95">
-            <div className="flex justify-between items-center pb-3 border-b border-surface-container">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 overflow-hidden">
+          <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant max-w-2xl w-full shadow-2xl flex flex-col max-h-[92vh] sm:max-h-[88vh] animate-in fade-in zoom-in-95 overflow-hidden">
+            {/* Header */}
+            <div className="flex justify-between items-center p-4 sm:p-5 border-b border-surface-container shrink-0 bg-surface-container-lowest">
               <div>
                 <h3 className="text-title-lg font-bold text-primary font-mono">
                   Order #{selectedOrderForDetails.orderNumber || selectedOrderForDetails.id}
@@ -827,88 +831,93 @@ export const AdminOrders = () => {
               <button
                 type="button"
                 onClick={() => setSelectedOrderForDetails(null)}
-                className="p-1 text-on-surface-variant hover:text-primary rounded-lg cursor-pointer"
+                className="p-1 text-on-surface-variant hover:text-primary rounded-lg cursor-pointer transition-colors"
               >
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
 
-            {/* Customer Information */}
-            <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant space-y-2">
-              <span className="text-label-sm font-bold text-outline uppercase block">Buyer &amp; Account Details</span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-body-sm">
-                <div>
-                  <p className="font-bold text-primary">{selectedOrderForDetails.customerDetails?.name || 'Customer'}</p>
-                  <p className="text-xs text-on-surface-variant">{selectedOrderForDetails.customerDetails?.businessName || 'Wholesale Buyer'}</p>
-                  <p className="text-xs text-on-surface-variant">Phone: {selectedOrderForDetails.customerDetails?.phone || 'N/A'}</p>
-                  <p className="text-xs text-on-surface-variant">Email: {selectedOrderForDetails.customerDetails?.email || 'N/A'}</p>
+            {/* Scrollable Body */}
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1 custom-scrollbar">
+              {/* Customer Information */}
+              <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant space-y-2">
+                <span className="text-label-sm font-bold text-outline uppercase block">Buyer &amp; Account Details</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-body-sm">
+                  <div>
+                    <p className="font-bold text-primary">{selectedOrderForDetails.customerDetails?.name || 'Customer'}</p>
+                    <p className="text-xs text-on-surface-variant">{selectedOrderForDetails.customerDetails?.businessName || 'Wholesale Buyer'}</p>
+                    <p className="text-xs text-on-surface-variant">Phone: {selectedOrderForDetails.customerDetails?.phone || 'N/A'}</p>
+                    <p className="text-xs text-on-surface-variant">Email: {selectedOrderForDetails.customerDetails?.email || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-on-surface-variant">
+                      GSTIN: <span className="font-mono font-bold text-primary">{selectedOrderForDetails.customerDetails?.gstin || 'Unregistered'}</span>
+                    </p>
+                    <p className="text-xs text-on-surface-variant mt-1">
+                      Logistics: <span className="font-medium text-primary">{selectedOrderForDetails.deliveryDetails?.transporter || 'VRL Logistics Cargo'}</span>
+                    </p>
+                    <p className="text-xs text-on-surface-variant">
+                      Destination: {selectedOrderForDetails.deliveryDetails?.addressLine1 || selectedOrderForDetails.shippingAddress?.address || ''}, {selectedOrderForDetails.deliveryDetails?.city || selectedOrderForDetails.shippingAddress?.city}, {selectedOrderForDetails.deliveryDetails?.state || selectedOrderForDetails.shippingAddress?.state} - {selectedOrderForDetails.deliveryDetails?.pincode || selectedOrderForDetails.shippingAddress?.pincode}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs text-on-surface-variant">
-                    GSTIN: <span className="font-mono font-bold text-primary">{selectedOrderForDetails.customerDetails?.gstin || 'Unregistered'}</span>
-                  </p>
-                  <p className="text-xs text-on-surface-variant mt-1">
-                    Logistics: <span className="font-medium text-primary">{selectedOrderForDetails.deliveryDetails?.transporter || 'VRL Logistics Cargo'}</span>
-                  </p>
-                  <p className="text-xs text-on-surface-variant">
-                    Destination: {selectedOrderForDetails.deliveryDetails?.addressLine1 || selectedOrderForDetails.shippingAddress?.address || ''}, {selectedOrderForDetails.deliveryDetails?.city || selectedOrderForDetails.shippingAddress?.city}, {selectedOrderForDetails.deliveryDetails?.state || selectedOrderForDetails.shippingAddress?.state} - {selectedOrderForDetails.deliveryDetails?.pincode || selectedOrderForDetails.shippingAddress?.pincode}
-                  </p>
+              </div>
+
+              {/* Line Items */}
+              <div className="space-y-2">
+                <span className="text-label-sm font-bold text-outline uppercase block">Purchased Line Items</span>
+                <div className="border border-outline-variant rounded-xl overflow-hidden">
+                  <table className="w-full text-body-sm text-left">
+                    <thead className="bg-surface-container text-label-sm text-primary font-bold">
+                      <tr>
+                        <th className="p-2.5">Product &amp; Size</th>
+                        <th className="p-2.5 text-center">Qty</th>
+                        <th className="p-2.5 text-right">Price</th>
+                        <th className="p-2.5 text-right">Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-outline-variant">
+                      {selectedOrderForDetails.items?.map((item, idx) => (
+                        <tr key={idx} className="hover:bg-surface-container-low">
+                          <td className="p-2.5">
+                            <span className="font-bold text-primary">{item.productName || 'White Towel'}</span>
+                            <span className="block text-xs text-on-surface-variant">Size: {item.size} cm</span>
+                          </td>
+                          <td className="p-2.5 text-center font-mono font-bold">{item.quantity} pcs</td>
+                          <td className="p-2.5 text-right font-mono">₹{item.price}</td>
+                          <td className="p-2.5 text-right font-mono font-bold">₹{(item.subtotal || item.price * item.quantity).toLocaleString('en-IN')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Totals Summary */}
+              <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant space-y-1.5 text-body-sm">
+                <div className="flex justify-between text-on-surface-variant">
+                  <span>Subtotal ({selectedOrderForDetails.totalPieces || selectedOrderForDetails.items?.reduce((s, i) => s + (i.quantity || 0), 0) || 0} pcs):</span>
+                  <span className="font-mono font-medium">₹{Number(selectedOrderForDetails.subtotal || 0).toLocaleString('en-IN')}</span>
+                </div>
+                {Number(selectedOrderForDetails.discount || 0) > 0 && (
+                  <div className="flex justify-between text-secondary">
+                    <span>Wholesale Tier Discount:</span>
+                    <span className="font-mono font-medium">- ₹{Number(selectedOrderForDetails.discount).toLocaleString('en-IN')}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-on-surface-variant">
+                  <span>GST (5%):</span>
+                  <span className="font-mono font-medium">₹{Number(selectedOrderForDetails.tax || 0).toLocaleString('en-IN')}</span>
+                </div>
+                <div className="flex justify-between text-primary font-bold text-title-md border-t border-surface-container pt-2 mt-1">
+                  <span>Grand Total:</span>
+                  <span className="font-mono text-secondary">₹{Number(selectedOrderForDetails.totalAmount || selectedOrderForDetails.total || 0).toLocaleString('en-IN')}.00</span>
                 </div>
               </div>
             </div>
 
-            {/* Line Items */}
-            <div className="space-y-2">
-              <span className="text-label-sm font-bold text-outline uppercase block">Purchased Line Items</span>
-              <table className="w-full text-body-sm text-left border border-outline-variant rounded-xl overflow-hidden">
-                <thead className="bg-surface-container text-label-sm text-primary font-bold">
-                  <tr>
-                    <th className="p-2.5">Product &amp; Size</th>
-                    <th className="p-2.5 text-center">Qty</th>
-                    <th className="p-2.5 text-right">Price</th>
-                    <th className="p-2.5 text-right">Subtotal</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-outline-variant">
-                  {selectedOrderForDetails.items?.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-surface-container-low">
-                      <td className="p-2.5">
-                        <span className="font-bold text-primary">{item.productName || 'White Towel'}</span>
-                        <span className="block text-xs text-on-surface-variant">Size: {item.size} cm</span>
-                      </td>
-                      <td className="p-2.5 text-center font-mono font-bold">{item.quantity} pcs</td>
-                      <td className="p-2.5 text-right font-mono">₹{item.price}</td>
-                      <td className="p-2.5 text-right font-mono font-bold">₹{(item.subtotal || item.price * item.quantity).toLocaleString('en-IN')}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Totals Summary */}
-            <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant space-y-1.5 text-body-sm">
-              <div className="flex justify-between text-on-surface-variant">
-                <span>Subtotal ({selectedOrderForDetails.totalPieces || selectedOrderForDetails.items?.reduce((s, i) => s + (i.quantity || 0), 0) || 0} pcs):</span>
-                <span className="font-mono font-medium">₹{Number(selectedOrderForDetails.subtotal || 0).toLocaleString('en-IN')}</span>
-              </div>
-              {Number(selectedOrderForDetails.discount || 0) > 0 && (
-                <div className="flex justify-between text-secondary">
-                  <span>Wholesale Tier Discount:</span>
-                  <span className="font-mono font-medium">- ₹{Number(selectedOrderForDetails.discount).toLocaleString('en-IN')}</span>
-                </div>
-              )}
-              <div className="flex justify-between text-on-surface-variant">
-                <span>GST (5%):</span>
-                <span className="font-mono font-medium">₹{Number(selectedOrderForDetails.tax || 0).toLocaleString('en-IN')}</span>
-              </div>
-              <div className="flex justify-between text-primary font-bold text-title-md border-t border-surface-container pt-2 mt-1">
-                <span>Grand Total:</span>
-                <span className="font-mono text-secondary">₹{Number(selectedOrderForDetails.totalAmount || selectedOrderForDetails.total || 0).toLocaleString('en-IN')}.00</span>
-              </div>
-            </div>
-
-            {/* Modal Actions */}
-            <div className="flex justify-end gap-3 pt-2">
+            {/* Footer */}
+            <div className="p-3 sm:p-4 bg-surface-container-low border-t border-surface-container shrink-0 flex justify-end gap-3">
               <button
                 type="button"
                 onClick={() => setSelectedOrderForDetails(null)}
@@ -919,10 +928,10 @@ export const AdminOrders = () => {
               {(selectedOrderForDetails.paymentStatus || '').toLowerCase() === 'paid' ? (
                 <Link
                   to={`/invoice/${selectedOrderForDetails._id || selectedOrderForDetails.orderNumber}`}
-                  className="px-5 py-2 bg-primary-container text-white rounded-lg font-bold text-label-md flex items-center gap-1.5 shadow"
+                  className="px-5 py-2.5 rounded-lg bg-primary text-white font-bold text-label-md shadow-md flex items-center gap-1.5 hover:bg-primary/90 transition-all"
                 >
                   <span className="material-symbols-outlined text-sm">receipt_long</span>
-                  <span>View Full Invoice</span>
+                  <span>View Official Invoice</span>
                 </Link>
               ) : (
                 <button

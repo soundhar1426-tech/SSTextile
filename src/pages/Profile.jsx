@@ -100,7 +100,20 @@ export const Profile = () => {
 
       const res = await updateProfile(payload);
       if (res.success) {
-        // If user is Admin, re-fetch updated mill settings so all frontend components reflect changes
+        // If user is Admin, synchronize mill settings and re-fetch so all frontend components reflect changes
+        if (isUserAdmin && updateMillSettings) {
+          try {
+            await updateMillSettings({
+              ...millSettings,
+              email: formData.email ? formData.email.trim() : millSettings?.email,
+              adminEmail: formData.email ? formData.email.trim() : millSettings?.adminEmail,
+              name: formData.businessName || millSettings?.name,
+              phone: formData.phone || millSettings?.phone,
+              gstin: formData.gstin || millSettings?.gstin,
+              address: formData.address || millSettings?.address,
+            });
+          } catch (e) {}
+        }
         if (isUserAdmin && fetchMillSettings) {
           await fetchMillSettings();
         }

@@ -64,7 +64,7 @@ export const AdminLogin = () => {
                 setEmail(e.target.value);
                 if (errorMsg) setErrorMsg('');
               }}
-              placeholder="admin@sstex.com"
+              placeholder="admin@sstextiles.com"
               className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3.5 py-2.5 text-body-md text-primary focus:ring-1 focus:ring-primary outline-none"
             />
           </div>

@@ -115,11 +115,11 @@ export const ProductForm = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [successBanner, setSuccessBanner] = useState('');
 
-  // Dynamic sizes list initialized instantly
+  // Dynamic sizes list initialized with 1 size only for new products
   const [sizes, setSizes] = useState(() => {
     if (initialProduct && Array.isArray(initialProduct.sizes) && initialProduct.sizes.length > 0) {
       return initialProduct.sizes.map((s, idx) => {
-        const dimStr = s.dimension || `${s.size} cm` || '25x50 cm';
+        const dimStr = s.dimension || `${s.size} cm` || '50x100 cm';
         const sizeKey = s.size || dimStr.replace(/cm|inch|in/gi, '').replace(/[×*X]/g, 'x').replace(/\s+/g, '').trim();
         const g = Number(s.grams) || Math.round(Number(s.weightKg || 0.1) * 1000) || 100;
         return {
@@ -135,16 +135,20 @@ export const ProductForm = () => {
         };
       });
     }
+    // New product creation starts with exactly ONE size card
     return [
-      { id: 'sz-init-1', size: '20x40', dimension: '20x40 cm', widthCm: 20, lengthCm: 40, price: 60, stock: 600, gsm: 450, grams: 36, weightKg: 0.036 },
-      { id: 'sz-init-2', size: '25x50', dimension: '25x50 cm', widthCm: 25, lengthCm: 50, price: 80, stock: 500, gsm: 500, grams: 63, weightKg: 0.063 },
-      { id: 'sz-init-3', size: '30x60', dimension: '30x60 cm', widthCm: 30, lengthCm: 60, price: 120, stock: 750, gsm: 550, grams: 99, weightKg: 0.099 },
-      { id: 'sz-init-4', size: '35x70', dimension: '35x70 cm', widthCm: 35, lengthCm: 70, price: 140, stock: 450, gsm: 550, grams: 135, weightKg: 0.135 },
-      { id: 'sz-init-5', size: '40x80', dimension: '40x80 cm', widthCm: 40, lengthCm: 80, price: 160, stock: 400, gsm: 600, grams: 192, weightKg: 0.192 },
-      { id: 'sz-init-6', size: '50x100', dimension: '50x100 cm', widthCm: 50, lengthCm: 100, price: 220, stock: 350, gsm: 600, grams: 300, weightKg: 0.300 },
-      { id: 'sz-init-7', size: '70x140', dimension: '70x140 cm', widthCm: 70, lengthCm: 140, price: 380, stock: 300, gsm: 650, grams: 637, weightKg: 0.637 },
-      { id: 'sz-init-8', size: '75x150', dimension: '75x150 cm', widthCm: 75, lengthCm: 150, price: 420, stock: 250, gsm: 650, grams: 731, weightKg: 0.731 },
-      { id: 'sz-init-9', size: '80x160', dimension: '80x160 cm', widthCm: 80, lengthCm: 160, price: 480, stock: 200, gsm: 700, grams: 896, weightKg: 0.896 },
+      {
+        id: 'sz-init-1',
+        size: '50x100',
+        dimension: '50x100 cm',
+        widthCm: 50,
+        lengthCm: 100,
+        price: 220,
+        stock: 350,
+        gsm: 600,
+        grams: 300,
+        weightKg: 0.300,
+      },
     ];
   });
 

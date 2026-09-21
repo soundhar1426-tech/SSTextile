@@ -8,6 +8,13 @@ export const Orders = () => {
 
   useEffect(() => {
     fetchCustomerOrders();
+
+    // Auto-poll every 5 seconds so buyer sees status and invoice updates in real-time
+    const interval = setInterval(() => {
+      fetchCustomerOrders();
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, [fetchCustomerOrders]);
 
   const filteredOrders = orders.filter((order) => {
@@ -16,7 +23,7 @@ export const Orders = () => {
 
     if (filterTab === 'ALL') return true;
     if (filterTab === 'PENDING') return payment === 'pending' || status === 'new';
-    if (filterTab === 'PAID') return payment === 'paid';
+    if (filterTab === 'PAID') return payment === 'paid' || status === 'confirmed';
     if (filterTab === 'PROCESSING') return status === 'processing' || status === 'confirmed' || status === 'ready_for_dispatch';
     if (filterTab === 'DELIVERED') return status === 'delivered';
     return true;
@@ -50,7 +57,7 @@ export const Orders = () => {
           </button>
         </div>
         <p className="text-body-sm text-on-surface-variant mt-0.5">
-          View your order progress, manual payment verification status, and printable GST invoices.
+          View your wholesale order progress, bill confirmation status, and printable GST tax invoices.
         </p>
       </section>
 
@@ -76,7 +83,7 @@ export const Orders = () => {
               : 'bg-surface-container border border-outline-variant text-on-surface hover:bg-surface-container-high'
               }`}
           >
-            <span>Pending Payment</span>
+            <span>Pending Verification</span>
             <span className="px-1.5 py-0.2 rounded-full bg-surface-dim text-on-surface-variant text-[10px] font-bold">
               {orders.filter((o) => (o.paymentStatus || '').toLowerCase() === 'pending').length}
             </span>
@@ -88,7 +95,7 @@ export const Orders = () => {
               : 'bg-surface-container border border-outline-variant text-on-surface hover:bg-surface-container-high'
               }`}
           >
-            <span>Paid &amp; Invoiced</span>
+            <span>Confirmed &amp; Invoiced</span>
             <span className="px-1.5 py-0.2 rounded-full bg-surface-dim text-on-surface-variant text-[10px] font-bold">
               {orders.filter((o) => (o.paymentStatus || '').toLowerCase() === 'paid').length}
             </span>
@@ -97,7 +104,7 @@ export const Orders = () => {
       </section>
 
       {/* Orders List */}
-      {loading ? (
+      {loading && orders.length === 0 ? (
         <div className="py-12 text-center text-on-surface-variant">
           <div className="inline-block w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin mb-2"></div>
           <p className="text-body-sm">Loading your orders...</p>
@@ -115,7 +122,7 @@ export const Orders = () => {
             to="/products"
             className="inline-block px-4 py-2 bg-primary text-white rounded-lg font-bold text-label-md mt-2 shadow"
           >
-            Browse Products
+            Browse Towel Catalog
           </Link>
         </div>
       ) : (
@@ -170,7 +177,7 @@ export const Orders = () => {
                         className={`w-1.5 h-1.5 rounded-full mr-1.5 ${isPaid ? 'bg-secondary' : 'bg-[#B76E00] pulse-live'
                           }`}
                       ></span>
-                      {isPaid ? 'Paid' : 'Payment Pending'}
+                      {isPaid ? '✓ Confirmed & Paid' : 'Payment Pending Verification'}
                     </span>
 
                     {/* Invoice Status Badge */}
@@ -183,7 +190,7 @@ export const Orders = () => {
                       <span className="material-symbols-outlined text-[15px] mr-1">
                         {isPaid ? 'receipt' : 'schedule'}
                       </span>
-                      {isPaid ? 'Invoice Generated' : 'Invoice Pending'}
+                      {isPaid ? '✓ GST Invoice Generated' : 'Bill Pending Confirmation'}
                     </span>
                   </div>
                 </div>
@@ -218,7 +225,7 @@ export const Orders = () => {
                       ₹{total.toLocaleString('en-IN')}.00
                     </span>
                     <span className="text-[10px] text-on-surface-variant block">
-                      Inclusive of GST
+                      Inclusive of 5% GST
                     </span>
                   </div>
 
@@ -229,11 +236,11 @@ export const Orders = () => {
                     {isPaid ? (
                       <span className="inline-flex items-center gap-1 text-label-md font-bold text-secondary">
                         <span className="material-symbols-outlined text-sm">check_circle</span>
-                        Invoice Generated {order.invoiceNumber ? `(${order.invoiceNumber})` : ''}
+                        Official GST Invoice Generated {order.invoiceNumber ? `(${order.invoiceNumber})` : ''}
                       </span>
                     ) : (
-                      <span className="text-xs text-on-surface-variant font-medium">
-                        Not Generated (Pending Payment)
+                      <span className="text-xs text-[#B76E00] font-semibold">
+                        Bill Under Admin Verification
                       </span>
                     )}
                   </div>
@@ -255,7 +262,7 @@ export const Orders = () => {
                       className="py-2 px-4 rounded-lg bg-primary-container hover:bg-primary text-white font-label-md font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
                     >
                       <span className="material-symbols-outlined text-[18px]">receipt_long</span>
-                      <span>View Tax Invoice</span>
+                      <span>View / Download GST Invoice</span>
                     </Link>
                   ) : (
                     <Link
@@ -263,7 +270,7 @@ export const Orders = () => {
                       className="py-2 px-4 rounded-lg bg-surface-container hover:bg-surface-container-high text-primary border border-outline-variant font-label-md font-bold flex items-center justify-center gap-1.5 shadow-xs active:scale-95 transition-all"
                     >
                       <span className="material-symbols-outlined text-[18px]">receipt</span>
-                      <span>{order.invoice ? 'View Proforma Bill' : 'View Bill (Pending)'}</span>
+                      <span>{order.invoice ? 'View Proforma Bill' : 'View Bill (Pending Confirmation)'}</span>
                     </Link>
                   )}
                 </div>

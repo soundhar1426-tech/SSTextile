@@ -7,7 +7,6 @@ export const OrderDetails = () => {
   const { getOrderById } = useOrders();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
-
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const fetchOrder = async (isManual = false) => {
@@ -23,6 +22,13 @@ export const OrderDetails = () => {
 
   useEffect(() => {
     fetchOrder();
+
+    // Auto-poll every 5 seconds for live status reflection
+    const interval = setInterval(() => {
+      fetchOrder();
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, [id, getOrderById]);
 
   if (loading) {
@@ -101,15 +107,15 @@ export const OrderDetails = () => {
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <span className="text-label-sm font-bold text-on-surface-variant bg-surface-container px-3 py-1.5 rounded-lg border border-outline-variant">
-                Invoice Pending Payment
+              <span className="text-label-sm font-bold text-[#8C5300] bg-[#FFF4E5] px-3 py-1.5 rounded-lg border border-[#FFE2B3]">
+                Bill Verification Pending
               </span>
               <Link
                 to={`/invoice/${order._id || orderNum}`}
                 className="px-4 py-2 bg-surface-container hover:bg-surface-container-high text-primary border border-outline-variant rounded-lg font-label-md font-bold flex items-center gap-1.5 shadow-xs active:scale-95 transition-all"
               >
                 <span className="material-symbols-outlined text-[18px]">receipt</span>
-                <span>{order.invoice ? 'View Proforma Bill' : 'View Bill'}</span>
+                <span>{order.invoice ? 'View Proforma Bill' : 'View Bill (Draft)'}</span>
               </Link>
             </div>
           )}
@@ -138,7 +144,7 @@ export const OrderDetails = () => {
                   : 'bg-[#FFF4E5] text-[#B76E00] border-[#FFE2B3]'
               }`}
             >
-              {isPaid ? '✓ Payment Confirmed (Paid)' : 'Payment Status: Pending Verification'}
+              {isPaid ? '✓ Bill Confirmed & Paid' : 'Payment Status: Pending Verification'}
             </span>
             <span
               className={`inline-flex items-center px-3 py-1 rounded-lg text-label-md font-bold border ${
@@ -150,7 +156,7 @@ export const OrderDetails = () => {
               <span className="material-symbols-outlined text-sm mr-1">
                 {isPaid ? 'receipt' : 'schedule'}
               </span>
-              {isPaid ? 'Invoice Generated' : 'Invoice Pending'}
+              {isPaid ? '✓ GST Tax Invoice Generated' : 'Invoice Pending'}
             </span>
           </div>
         </div>
@@ -163,7 +169,7 @@ export const OrderDetails = () => {
               <div>
                 <p className="font-bold">Official Bill &amp; Payment Details</p>
                 <p>
-                  Review the official bill details and bank account information. Once payment is received and confirmed by our mill admin, your final GST tax invoice will be generated.
+                  Review the official bill details and bank account information. Once payment is confirmed by SSTextiles admin, your final GST tax invoice will be generated.
                 </p>
               </div>
             </div>
@@ -180,10 +186,10 @@ export const OrderDetails = () => {
             <div className="flex items-center gap-2.5">
               <span className="material-symbols-outlined text-2xl text-secondary">verified</span>
               <div>
-                <p className="font-bold text-body-md text-primary">Order #{orderNum} • Payment Verified &amp; Confirmed</p>
+                <p className="font-bold text-body-md text-primary">Order #{orderNum} • Bill Confirmed &amp; Payment Verified</p>
                 <p className="text-xs text-secondary font-bold flex items-center gap-1.5 mt-0.5">
                   <span className="material-symbols-outlined text-sm">receipt</span>
-                  <span>Invoice Status: <strong>Invoice Generated</strong> {order.invoiceNumber ? `(${order.invoiceNumber})` : ''}</span>
+                  <span>Invoice Status: <strong>Official GST Tax Invoice Generated</strong> {order.invoiceNumber ? `(${order.invoiceNumber})` : ''}</span>
                 </p>
               </div>
             </div>

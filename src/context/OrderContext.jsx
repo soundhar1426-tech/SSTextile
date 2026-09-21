@@ -1,12 +1,20 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import api from '../api/axios';
 import { useAuth } from './AuthContext';
 import { millInfo } from '../data/mockData';
+import {
+  playNewOrderSound,
+  announceNewOrder,
+  unlockAudio,
+  requestNotificationPermission,
+  showDesktopNotification,
+} from '../utils/soundAlert';
 
 const OrderContext = createContext();
 
 const LOCAL_ORDERS_KEY = 'gtex_local_orders';
 const LOCAL_INVOICES_KEY = 'gtex_local_invoices';
+const SOUND_ENABLED_KEY = 'sst_sound_enabled';
 
 export const deduplicateOrders = (rawOrders) => {
   if (!Array.isArray(rawOrders)) return [];
@@ -85,6 +93,26 @@ export const OrderProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Real-time Sound & New Order Alerts
+  const [soundEnabled, setSoundEnabledState] = useState(() => {
+    try {
+      const stored = localStorage.getItem(SOUND_ENABLED_KEY);
+      return stored !== null ? JSON.parse(stored) : true;
+    } catch (e) {
+      return true;
+    }
+  });
+  const [newOrderAlert, setNewOrderAlert] = useState(null);
+  const seenOrderIdsRef = useRef(new Set());
+  const initialLoadCompletedRef = useRef(false);
+
+  const setSoundEnabled = useCallback((val) => {
+    setSoundEnabledState(val);
+    try {
+      localStorage.setItem(SOUND_ENABLED_KEY, JSON.stringify(val));
+    } catch (e) {}
+  }, []);
+
   // Sync state to localStorage whenever orders change
   const updateOrdersState = useCallback((updater) => {
     setOrders((prev) => {
@@ -99,7 +127,6 @@ export const OrderProvider = ({ children }) => {
    */
   const fetchCustomerOrders = useCallback(async () => {
     if (!token) return;
-    setLoading(true);
     try {
       const response = await api.get('/orders');
       if (response.data?.success && Array.isArray(response.data.orders)) {
@@ -108,18 +135,15 @@ export const OrderProvider = ({ children }) => {
       }
     } catch (err) {
       console.warn('[OrderContext] Fetch customer orders offline notice:', err.message);
-    } finally {
-      setLoading(false);
     }
   }, [token, updateOrdersState]);
 
   /**
-   * Fetch all wholesale orders for admin dashboard
+   * Fetch all wholesale orders for admin dashboard & detect new incoming orders
    */
   const fetchAdminOrders = useCallback(
     async (status = 'ALL', paymentStatus = 'ALL', invoiceStatus = 'ALL', search = '') => {
       if (!token || !isAdmin) return;
-      setLoading(true);
       try {
         const params = {};
         if (status && status !== 'ALL') params.status = status;
@@ -130,6 +154,36 @@ export const OrderProvider = ({ children }) => {
         const response = await api.get('/admin/orders', { params });
         if (response.data?.success && Array.isArray(response.data.orders)) {
           const liveOrders = deduplicateOrders(response.data.orders);
+          
+          // Check for newly placed orders if initial load already happened
+          if (initialLoadCompletedRef.current && liveOrders.length > 0) {
+            const newlyArrived = liveOrders.filter((ord) => {
+              const key = ord._id || ord.id || ord.orderNumber;
+              return key && !seenOrderIdsRef.current.has(key);
+            });
+
+            if (newlyArrived.length > 0) {
+              const latest = newlyArrived[0];
+              if (soundEnabled) {
+                playNewOrderSound();
+                announceNewOrder(latest.orderNumber, latest.customerDetails?.businessName || latest.customerDetails?.name);
+              }
+              showDesktopNotification(
+                '🚨 New Wholesale Order Received!',
+                `Order #${latest.orderNumber || latest.id} received for ₹${Number(latest.totalAmount || latest.total || 0).toLocaleString('en-IN')}`
+              );
+              setNewOrderAlert(latest);
+            }
+          }
+
+          // Update known order IDs
+          liveOrders.forEach((o) => {
+            if (o._id) seenOrderIdsRef.current.add(o._id);
+            if (o.id) seenOrderIdsRef.current.add(o.id);
+            if (o.orderNumber) seenOrderIdsRef.current.add(o.orderNumber);
+          });
+
+          initialLoadCompletedRef.current = true;
           updateOrdersState(liveOrders);
           if (response.data.stats) {
             setOrderStats(response.data.stats);
@@ -137,23 +191,130 @@ export const OrderProvider = ({ children }) => {
         }
       } catch (err) {
         console.warn('[OrderContext] Fetch admin orders offline notice:', err.message);
-      } finally {
-        setLoading(false);
       }
     },
-    [token, isAdmin, updateOrdersState]
+    [token, isAdmin, soundEnabled, updateOrdersState]
   );
 
-  // Automatically fetch on auth change
+  // Initialize seed list of order IDs into seen set
   useEffect(() => {
-    if (token) {
+    const stored = getStoredOrders();
+    stored.forEach((o) => {
+      if (o._id) seenOrderIdsRef.current.add(o._id);
+      if (o.id) seenOrderIdsRef.current.add(o.id);
+      if (o.orderNumber) seenOrderIdsRef.current.add(o.orderNumber);
+    });
+  }, []);
+
+  // Request browser notification permissions on mount
+  useEffect(() => {
+    requestNotificationPermission();
+  }, []);
+
+  // Automatically fetch on auth change + start real-time poller
+  useEffect(() => {
+    if (!token) return;
+
+    if (isAdmin) {
+      fetchAdminOrders();
+      // Fast 4-second polling for immediate reflection of new orders placed by buyers
+      const adminInterval = setInterval(() => {
+        fetchAdminOrders();
+      }, 4000);
+      return () => clearInterval(adminInterval);
+    } else {
+      fetchCustomerOrders();
+      // 5-second polling for buyer portal to reflect confirmed bills & invoices
+      const buyerInterval = setInterval(() => {
+        fetchCustomerOrders();
+      }, 5000);
+      return () => clearInterval(buyerInterval);
+    }
+  }, [token, isAdmin, fetchCustomerOrders, fetchAdminOrders]);
+
+  // Cross-tab & intra-window real-time event listeners
+  useEffect(() => {
+    const handleNewOrderPlacedEvent = (event) => {
+      const order = event.detail?.order;
+      if (order) {
+        updateOrdersState((prev) => [order, ...prev]);
+        if (isAdmin) {
+          if (soundEnabled) {
+            playNewOrderSound();
+            announceNewOrder(order.orderNumber, order.customerDetails?.businessName || order.customerDetails?.name);
+          }
+          setNewOrderAlert(order);
+          showDesktopNotification(
+            '🚨 New Wholesale Order Received!',
+            `Order #${order.orderNumber || order.id} for ₹${Number(order.totalAmount || order.total || 0).toLocaleString('en-IN')}`
+          );
+        }
+      }
+    };
+
+    const handleOrderStatusUpdatedEvent = (event) => {
+      const { order, invoice } = event.detail || {};
+      if (order) {
+        updateOrdersState((prev) =>
+          prev.map((o) => (o._id === order._id || o.orderNumber === order.orderNumber ? { ...o, ...order } : o))
+        );
+      }
+      if (invoice) {
+        const orderKey = invoice.order?._id || invoice.order || invoice.orderNumber;
+        if (orderKey) saveStoredInvoice(orderKey, invoice);
+      }
       if (isAdmin) {
         fetchAdminOrders();
       } else {
         fetchCustomerOrders();
       }
-    }
-  }, [token, isAdmin, fetchCustomerOrders, fetchAdminOrders]);
+    };
+
+    const handleStorageChange = (e) => {
+      if (e.key === 'sst_last_order_placed' && e.newValue) {
+        try {
+          const data = JSON.parse(e.newValue);
+          if (data?.order) {
+            updateOrdersState((prev) => [data.order, ...prev]);
+            if (isAdmin) {
+              if (soundEnabled) {
+                playNewOrderSound();
+                announceNewOrder(data.order.orderNumber, data.order.customerDetails?.businessName || data.order.customerDetails?.name);
+              }
+              setNewOrderAlert(data.order);
+              showDesktopNotification(
+                '🚨 New Wholesale Order Received!',
+                `Order #${data.order.orderNumber || data.order.id} for ₹${Number(data.order.totalAmount || data.order.total || 0).toLocaleString('en-IN')}`
+              );
+            }
+          }
+        } catch (err) {}
+      } else if (e.key === 'sst_last_order_status_updated') {
+        if (isAdmin) {
+          fetchAdminOrders();
+        } else {
+          fetchCustomerOrders();
+        }
+      } else if (e.key === LOCAL_ORDERS_KEY && e.newValue) {
+        try {
+          const updated = JSON.parse(e.newValue);
+          if (Array.isArray(updated)) {
+            setOrders(deduplicateOrders(updated));
+          }
+        } catch (err) {}
+      }
+    };
+
+    window.addEventListener('sst_new_order_placed', handleNewOrderPlacedEvent);
+    window.addEventListener('sst_order_status_updated', handleOrderStatusUpdatedEvent);
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('sst_new_order_placed', handleNewOrderPlacedEvent);
+      window.removeEventListener('sst_order_status_updated', handleOrderStatusUpdatedEvent);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [isAdmin, soundEnabled, fetchAdminOrders, fetchCustomerOrders, updateOrdersState]);
 
   /**
    * Create wholesale order and decrement inventory stock
@@ -162,7 +323,7 @@ export const OrderProvider = ({ children }) => {
     setLoading(true);
     setError(null);
 
-    const fallbackOrderNumber = `SST-${Math.floor(100000 + Math.random() * 900000)}`;
+    const fallbackOrderNumber = `GTX-${Math.floor(10000 + Math.random() * 90000)}`;
     const localOrder = {
       ...orderData,
       _id: `ord-${Date.now()}`,
@@ -170,6 +331,7 @@ export const OrderProvider = ({ children }) => {
       orderNumber: fallbackOrderNumber,
       orderStatus: 'new',
       paymentStatus: 'pending',
+      invoiceStatus: 'not_generated',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -177,13 +339,28 @@ export const OrderProvider = ({ children }) => {
     // Optimistically add to state and localStorage
     updateOrdersState((prev) => [localOrder, ...prev]);
 
-    // Dispatch stock decrement event immediately
-    if (orderData?.items && typeof window !== 'undefined') {
+    // Dispatch stock decrement and new order notifications
+    if (typeof window !== 'undefined') {
+      if (orderData?.items) {
+        window.dispatchEvent(
+          new CustomEvent('sst_order_stock_decrement', {
+            detail: { items: orderData.items },
+          })
+        );
+      }
+
+      // Broadcast new order event immediately across tabs & window
       window.dispatchEvent(
-        new CustomEvent('sst_order_stock_decrement', {
-          detail: { items: orderData.items },
+        new CustomEvent('sst_new_order_placed', {
+          detail: { order: localOrder },
         })
       );
+      try {
+        localStorage.setItem(
+          'sst_last_order_placed',
+          JSON.stringify({ order: localOrder, timestamp: Date.now() })
+        );
+      } catch (e) {}
     }
 
     try {
@@ -195,6 +372,22 @@ export const OrderProvider = ({ children }) => {
             o._id === localOrder._id || o.orderNumber === localOrder.orderNumber ? newOrder : o
           )
         );
+
+        // Update broadcast with verified backend order
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('sst_new_order_placed', {
+              detail: { order: newOrder },
+            })
+          );
+          try {
+            localStorage.setItem(
+              'sst_last_order_placed',
+              JSON.stringify({ order: newOrder, timestamp: Date.now() })
+            );
+          } catch (e) {}
+        }
+
         return { success: true, order: newOrder };
       }
     } catch (err) {
@@ -258,7 +451,7 @@ export const OrderProvider = ({ children }) => {
   };
 
   /**
-   * Fetch invoice for an order (Guard: Only paid orders return invoice)
+   * Fetch invoice for an order
    */
   const getOrderInvoice = async (orderId) => {
     if (!orderId) return { success: false, error: 'No order ID provided' };
@@ -281,12 +474,14 @@ export const OrderProvider = ({ children }) => {
       return { success: true, invoice: storedInvoices[cleanId] };
     }
 
-    // 3. Check order and generate synthetic invoice if order is paid or found
+    // 3. Check order and generate synthetic proforma / final invoice
     const order = await getOrderById(cleanId);
     if (order) {
       const isPaid = (order.paymentStatus || '').toLowerCase() === 'paid';
       const orderNum = order.orderNumber || cleanId;
-      const invNum = `SST-INV-${orderNum.replace(/^SST-|^GTX-/, '')}`;
+      const invNum = isPaid
+        ? `GTX-INV-${orderNum.replace(/^SST-|^GTX-/, '')}`
+        : `PROFORMA-${orderNum}`;
 
       const syntheticInvoice = {
         _id: `inv-${order._id || cleanId}`,
@@ -299,26 +494,26 @@ export const OrderProvider = ({ children }) => {
         paymentStatus: isPaid ? 'paid' : 'pending',
         paymentDetails: order.paymentDetails || { method: 'UPI / Direct Bank Transfer' },
         millDetails: {
-          name: millInfo.name,
-          tagline: millInfo.tagline,
+          name: millInfo.name || 'GOWTHAM TEX',
+          tagline: millInfo.tagline || 'Whole Sale Hand Looms Cloth Manufacturer',
           deityText: millInfo.deityText || 'SHIVAM',
           address: millInfo.address,
-          gstin: millInfo.gstin,
+          gstin: millInfo.gstin || '33BRWPV7711D1ZD',
           stateCode: millInfo.stateCode || '33',
           phone: millInfo.phone,
           email: millInfo.email,
           bankDetails: millInfo.bankDetails,
         },
         buyerDetails: {
-          name: order.customer?.name || 'Authorized Buyer',
-          businessName: order.customer?.businessName || '',
-          gstin: order.customer?.gstin || '',
-          phone: order.customer?.phone || '',
-          email: order.customer?.email || '',
-          address: order.shippingAddress?.street || order.customer?.address || 'Direct Dispatch',
-          city: order.shippingAddress?.city || '',
-          state: order.shippingAddress?.state || 'Tamil Nadu',
-          pincode: order.shippingAddress?.pincode || '',
+          name: order.customerDetails?.name || order.customer?.name || 'Authorized Buyer',
+          businessName: order.customerDetails?.businessName || order.customer?.businessName || '',
+          gstin: order.customerDetails?.gstin || order.customer?.gstin || '',
+          phone: order.customerDetails?.phone || order.customer?.phone || '',
+          email: order.customerDetails?.email || order.customer?.email || '',
+          address: order.deliveryDetails?.addressLine1 || order.shippingAddress?.address || 'Direct Dispatch',
+          city: order.deliveryDetails?.city || order.shippingAddress?.city || 'Erode',
+          state: order.deliveryDetails?.state || order.shippingAddress?.state || 'Tamil Nadu',
+          pincode: order.deliveryDetails?.pincode || order.shippingAddress?.pincode || '638001',
         },
         items: order.items || [],
         subtotal: order.subtotal || order.totalAmount || 0,
@@ -335,11 +530,9 @@ export const OrderProvider = ({ children }) => {
         createdAt: order.createdAt || new Date().toISOString(),
       };
 
-      if (isPaid || isAdmin) {
-        saveStoredInvoice(cleanId, syntheticInvoice);
-        saveStoredInvoice(invNum, syntheticInvoice);
-        return { success: true, invoice: syntheticInvoice };
-      }
+      saveStoredInvoice(cleanId, syntheticInvoice);
+      saveStoredInvoice(invNum, syntheticInvoice);
+      return { success: true, invoice: syntheticInvoice };
     }
 
     return { success: false, error: 'Invoice is generated after payment confirmation.' };
@@ -366,6 +559,21 @@ export const OrderProvider = ({ children }) => {
       })
     );
 
+    // Broadcast status update
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('sst_order_status_updated', {
+          detail: { orderId: cleanId, status: newStatus },
+        })
+      );
+      try {
+        localStorage.setItem(
+          'sst_last_order_status_updated',
+          JSON.stringify({ orderId: cleanId, status: newStatus, timestamp: Date.now() })
+        );
+      } catch (e) {}
+    }
+
     try {
       const response = await api.patch(`/admin/orders/${cleanId}/status`, {
         status: newStatus,
@@ -387,13 +595,12 @@ export const OrderProvider = ({ children }) => {
   };
 
   /**
-   * Confirm manual payment received (Admin)
+   * Confirm manual payment received, change status to confirmed/paid, and issue final GST invoice
    */
   const confirmPayment = async (orderId, paymentData = {}) => {
     const cleanId = String(orderId).trim();
     const paidAt = new Date().toISOString();
 
-    // Create synthetic invoice and updated order locally
     let targetOrder = orders.find((o) => o._id === cleanId || o.orderNumber === cleanId || o.id === cleanId);
     if (!targetOrder) {
       const stored = getStoredOrders();
@@ -401,7 +608,7 @@ export const OrderProvider = ({ children }) => {
     }
 
     const orderNum = targetOrder?.orderNumber || cleanId;
-    const invNum = `SST-INV-${orderNum.replace(/^SST-|^GTX-/, '')}`;
+    const invNum = `GTX-INV-${orderNum.replace(/^SST-|^GTX-/, '')}`;
 
     const localInvoice = {
       _id: `inv-${targetOrder?._id || cleanId}`,
@@ -414,31 +621,31 @@ export const OrderProvider = ({ children }) => {
       paymentStatus: 'paid',
       paymentDetails: {
         method: paymentData.paymentMethod || 'UPI',
-        reference: paymentData.paymentReference || 'VERIFIED-DESK',
+        reference: paymentData.paymentReference || `VERIFIED-${Date.now().toString().slice(-6)}`,
         confirmedAt: paidAt,
         amount: paymentData.amount || targetOrder?.totalAmount || targetOrder?.total || 0,
       },
       millDetails: {
-        name: millInfo.name,
-        tagline: millInfo.tagline,
+        name: millInfo.name || 'GOWTHAM TEX',
+        tagline: millInfo.tagline || 'Whole Sale Hand Looms Cloth Manufacturer',
         deityText: millInfo.deityText || 'SHIVAM',
         address: millInfo.address,
-        gstin: millInfo.gstin,
+        gstin: millInfo.gstin || '33BRWPV7711D1ZD',
         stateCode: millInfo.stateCode || '33',
         phone: millInfo.phone,
         email: millInfo.email,
         bankDetails: millInfo.bankDetails,
       },
       buyerDetails: {
-        name: targetOrder?.customer?.name || 'Authorized Buyer',
-        businessName: targetOrder?.customer?.businessName || '',
-        gstin: targetOrder?.customer?.gstin || '',
-        phone: targetOrder?.customer?.phone || '',
-        email: targetOrder?.customer?.email || '',
-        address: targetOrder?.shippingAddress?.street || targetOrder?.customer?.address || 'Direct Dispatch',
-        city: targetOrder?.shippingAddress?.city || '',
-        state: targetOrder?.shippingAddress?.state || 'Tamil Nadu',
-        pincode: targetOrder?.shippingAddress?.pincode || '',
+        name: targetOrder?.customerDetails?.name || targetOrder?.customer?.name || 'Authorized Buyer',
+        businessName: targetOrder?.customerDetails?.businessName || targetOrder?.customer?.businessName || '',
+        gstin: targetOrder?.customerDetails?.gstin || targetOrder?.customer?.gstin || '',
+        phone: targetOrder?.customerDetails?.phone || targetOrder?.customer?.phone || '',
+        email: targetOrder?.customerDetails?.email || targetOrder?.customer?.email || '',
+        address: targetOrder?.deliveryDetails?.addressLine1 || targetOrder?.shippingAddress?.address || 'Direct Dispatch',
+        city: targetOrder?.deliveryDetails?.city || targetOrder?.shippingAddress?.city || 'Erode',
+        state: targetOrder?.deliveryDetails?.state || targetOrder?.shippingAddress?.state || 'Tamil Nadu',
+        pincode: targetOrder?.deliveryDetails?.pincode || targetOrder?.shippingAddress?.pincode || '638001',
       },
       items: targetOrder?.items || [],
       subtotal: targetOrder?.subtotal || targetOrder?.totalAmount || 0,
@@ -470,6 +677,7 @@ export const OrderProvider = ({ children }) => {
             paidAt,
             paymentDetails: localInvoice.paymentDetails,
             invoiceNumber: invNum,
+            invoiceStatus: 'generated',
             invoice: localInvoice,
             updatedAt: paidAt,
           };
@@ -477,6 +685,21 @@ export const OrderProvider = ({ children }) => {
         return o;
       })
     );
+
+    // Broadcast across app
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('sst_order_status_updated', {
+          detail: { order: targetOrder, invoice: localInvoice },
+        })
+      );
+      try {
+        localStorage.setItem(
+          'sst_last_order_status_updated',
+          JSON.stringify({ orderId: cleanId, status: 'confirmed', timestamp: Date.now() })
+        );
+      } catch (e) {}
+    }
 
     try {
       const response = await api.patch(`/admin/orders/${cleanId}/payment`, paymentData);
@@ -498,6 +721,29 @@ export const OrderProvider = ({ children }) => {
 
     const updatedOrder = orders.find((o) => o._id === cleanId || o.orderNumber === cleanId) || targetOrder;
     return { success: true, order: updatedOrder, invoice: localInvoice };
+  };
+
+  /**
+   * Verify, check and confirm bill & generate GST Tax Invoice in one seamless step
+   */
+  const verifyAndConfirmBill = async (orderId, billData = {}) => {
+    const cleanId = String(orderId).trim();
+    
+    // 1. Update bill details on server
+    try {
+      await api.put(`/admin/invoices/${cleanId}`, billData);
+    } catch (e) {
+      try {
+        await api.put(`/admin/orders/${cleanId}/invoice`, billData);
+      } catch (e2) {}
+    }
+
+    // 2. Confirm payment and generate final GST invoice
+    return await confirmPayment(cleanId, {
+      paymentMethod: billData.paymentMethod || 'UPI',
+      paymentReference: billData.paymentReference || `VERIFIED-${Date.now().toString().slice(-6)}`,
+      amount: billData.totalAmount || billData.total,
+    });
   };
 
   /**
@@ -525,7 +771,7 @@ export const OrderProvider = ({ children }) => {
       }
     } catch (err) {
       try {
-        const fallbackRes = await api.put(`/orders/${cleanId}/invoice`, updatedData);
+        const fallbackRes = await api.put(`/admin/orders/${cleanId}/invoice`, updatedData);
         if (fallbackRes.data?.success) {
           const updatedInvoice = fallbackRes.data.invoice;
           const updatedOrder = fallbackRes.data.order;
@@ -579,6 +825,14 @@ export const OrderProvider = ({ children }) => {
         orderStats,
         loading,
         error,
+        soundEnabled,
+        setSoundEnabled,
+        newOrderAlert,
+        clearNewOrderAlert: () => setNewOrderAlert(null),
+        playTestSound: () => {
+          unlockAudio();
+          playNewOrderSound();
+        },
         fetchCustomerOrders,
         fetchAdminOrders,
         createOrder,
@@ -586,6 +840,7 @@ export const OrderProvider = ({ children }) => {
         getOrderInvoice,
         updateOrderStatus,
         confirmPayment,
+        verifyAndConfirmBill,
         updateInvoice,
         fetchAdminInvoices,
       }}

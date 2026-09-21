@@ -1,15 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, Outlet, Link, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useProducts } from '../context/ProductContext';
+import { useOrders } from '../context/OrderContext';
 import { millInfo } from '../data/mockData';
+import { unlockAudio } from '../utils/soundAlert';
 
 export const AdminLayout = () => {
   const { isAdmin, currentUser, logoutAdmin } = useAuth();
   const { millSettings } = useProducts();
+  const { soundEnabled, setSoundEnabled, playTestSound, newOrderAlert, clearNewOrderAlert } = useOrders();
   const currentMill = millSettings || millInfo;
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Auto-unlock audio context on user interaction
+  useEffect(() => {
+    const handleUnlock = () => {
+      unlockAudio();
+    };
+    window.addEventListener('click', handleUnlock, { once: true });
+    window.addEventListener('touchstart', handleUnlock, { once: true });
+    return () => {
+      window.removeEventListener('click', handleUnlock);
+      window.removeEventListener('touchstart', handleUnlock);
+    };
+  }, []);
 
   // Route guard: Redirect customers to admin login if not authenticated
   if (!isAdmin) {
@@ -31,6 +47,13 @@ export const AdminLayout = () => {
     navigate('/admin/login');
   };
 
+  const handleTestSound = () => {
+    if (!soundEnabled) {
+      setSoundEnabled(true);
+    }
+    playTestSound();
+  };
+
   return (
     <div className="min-h-screen bg-background text-on-surface flex flex-col">
       {/* Admin Top App Bar */}
@@ -45,7 +68,7 @@ export const AdminLayout = () => {
           </button>
           <div className="flex flex-col">
             <span className="text-headline-sm font-bold text-primary tracking-tight leading-none">
-              {currentMill.name || 'SSTextiles'}
+              {currentMill.name || 'GOWTHAM TEX'}
             </span>
             <span className="text-label-sm font-label-sm text-on-surface-variant tracking-wider uppercase font-bold">
               Admin Mill Portal
@@ -54,7 +77,33 @@ export const AdminLayout = () => {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          <div className="flex items-center bg-surface-container-low px-2 py-1 rounded-lg border border-outline-variant">
+          {/* Audio Chime Notification Toggle & Test */}
+          <div className="flex items-center gap-1 bg-surface-container-low px-2 py-1 rounded-lg border border-outline-variant">
+            <button
+              type="button"
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              className={`p-1 rounded flex items-center gap-1 text-xs font-bold transition-all cursor-pointer ${
+                soundEnabled ? 'text-secondary' : 'text-on-surface-variant'
+              }`}
+              title={soundEnabled ? 'Order sound alert is ON. Click to mute.' : 'Order sound alert is muted. Click to turn ON.'}
+            >
+              <span className="material-symbols-outlined text-base">
+                {soundEnabled ? 'volume_up' : 'volume_off'}
+              </span>
+              <span className="hidden lg:inline">{soundEnabled ? 'Sound: ON' : 'Muted'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleTestSound}
+              className="text-[10px] px-1.5 py-0.5 rounded bg-primary text-white font-bold hover:bg-primary/90 transition-all cursor-pointer hidden sm:inline-block"
+              title="Test the 3-tone incoming order sound chime"
+            >
+              Test Sound
+            </button>
+          </div>
+
+          <div className="hidden sm:flex items-center bg-surface-container-low px-2 py-1 rounded-lg border border-outline-variant">
             <span className="w-2 h-2 rounded-full bg-secondary mr-1.5 pulse-live"></span>
             <span className="text-label-sm font-label-sm text-secondary uppercase tracking-wider font-bold">
               Live Hub
@@ -71,7 +120,7 @@ export const AdminLayout = () => {
 
           <button
             onClick={handleLogout}
-            className="p-1.5 rounded-lg text-error hover:bg-error-container/40 transition-colors"
+            className="p-1.5 rounded-lg text-error hover:bg-error-container/40 transition-colors cursor-pointer"
             title="Logout Admin"
           >
             <span className="material-symbols-outlined">logout</span>
@@ -191,10 +240,48 @@ export const AdminLayout = () => {
         )}
 
         {/* Page Content Outlet */}
-        <main className="flex-1 p-4 md:p-6 max-w-6xl mx-auto w-full pb-24">
+        <main className="flex-1 p-4 md:p-6 max-w-6xl mx-auto w-full pb-24 space-y-4">
+          {/* Global Sticky Real-Time New Order Banner */}
+          {newOrderAlert && (
+            <div className="p-4 bg-[#E6F5F0] border-2 border-secondary-fixed rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-lg animate-bounce sticky top-16 z-30">
+              <div className="flex items-center gap-3">
+                <span className="w-10 h-10 rounded-full bg-secondary text-white flex items-center justify-center font-bold shrink-0">
+                  <span className="material-symbols-outlined">notifications_active</span>
+                </span>
+                <div>
+                  <p className="font-bold text-primary text-body-md">
+                    🔔 NEW WHOLESALE ORDER #{newOrderAlert.orderNumber || newOrderAlert.id} PLACED!
+                  </p>
+                  <p className="text-xs text-secondary font-semibold">
+                    Buyer: {newOrderAlert.customerDetails?.businessName || newOrderAlert.customerDetails?.name || 'Customer'} • Total: ₹{Number(newOrderAlert.totalAmount || newOrderAlert.total || 0).toLocaleString('en-IN')} • Carrier: {newOrderAlert.deliveryDetails?.transporter || 'VRL Logistics'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Link
+                  to={`/admin/orders?checkOrder=${newOrderAlert._id || newOrderAlert.orderNumber || newOrderAlert.id}`}
+                  onClick={clearNewOrderAlert}
+                  className="px-3.5 py-1.5 bg-primary text-white rounded-lg text-label-sm font-bold shadow hover:bg-primary/90 flex items-center gap-1 cursor-pointer transition-all"
+                >
+                  <span className="material-symbols-outlined text-sm">fact_check</span>
+                  <span>Check Bill &amp; Confirm</span>
+                </Link>
+                <button
+                  type="button"
+                  onClick={clearNewOrderAlert}
+                  className="px-3 py-1.5 bg-surface-container border border-outline-variant text-on-surface-variant rounded-lg text-label-sm font-bold hover:bg-surface-container-high cursor-pointer transition-all"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
+
           <Outlet />
         </main>
       </div>
     </div>
   );
 };
+
+export default AdminLayout;

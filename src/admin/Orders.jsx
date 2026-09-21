@@ -1,24 +1,42 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useOrders, deduplicateOrders } from '../context/OrderContext';
+import { useProducts } from '../context/ProductContext';
+import { millInfo } from '../data/mockData';
 import { playNewOrderSound, requestNotificationPermission, showDesktopNotification } from '../utils/soundAlert';
 
 export const AdminOrders = () => {
-  const { orders, orderStats, fetchAdminOrders, updateOrderStatus, confirmPayment, loading } = useOrders();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const {
+    orders,
+    orderStats,
+    fetchAdminOrders,
+    updateOrderStatus,
+    confirmPayment,
+    verifyAndConfirmBill,
+    updateInvoice,
+    soundEnabled,
+    setSoundEnabled,
+    playTestSound,
+    loading,
+  } = useOrders();
+
+  const { millSettings } = useProducts();
+  const currentMill = millSettings || millInfo;
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [filterPayment, setFilterPayment] = useState('ALL');
   const [filterInvoice, setFilterInvoice] = useState('ALL');
 
-  const [selectedOrderForPayment, setSelectedOrderForPayment] = useState(null);
+  // Active Modals State
+  const [selectedOrderForBillCheck, setSelectedOrderForBillCheck] = useState(null);
+  const [billCheckForm, setBillCheckForm] = useState(null);
+  const [isConfirmingBill, setIsConfirmingBill] = useState(false);
+
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState(null);
-  const [paymentMethod, setPaymentMethod] = useState('UPI');
-  const [paymentRef, setPaymentRef] = useState('');
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState(null);
   const [newOrderAlert, setNewOrderAlert] = useState(null);
-  const [soundEnabled, setSoundEnabled] = useState(true);
 
   const prevOrdersCountRef = useRef(null);
 
@@ -34,12 +52,32 @@ export const AdminOrders = () => {
 
     const interval = setInterval(() => {
       fetchAdminOrders(filterStatus, filterPayment, filterInvoice, searchQuery);
-    }, 6000);
+    }, 4000);
 
     return () => clearInterval(interval);
   }, [fetchAdminOrders, filterStatus, filterPayment, filterInvoice, searchQuery]);
 
-  // Detect new incoming order for audio and visual notification
+  // Handle URL query parameter `?checkOrder=...` to automatically open Bill Verification modal
+  useEffect(() => {
+    const checkOrderParam = searchParams.get('checkOrder');
+    if (checkOrderParam && uniqueOrders.length > 0) {
+      const target = uniqueOrders.find(
+        (o) =>
+          o._id === checkOrderParam ||
+          o.id === checkOrderParam ||
+          o.orderNumber === checkOrderParam ||
+          o.orderNumber?.toUpperCase() === checkOrderParam.toUpperCase()
+      );
+      if (target) {
+        handleOpenBillCheckModal(target);
+        // Clean URL parameter
+        searchParams.delete('checkOrder');
+        setSearchParams(searchParams, { replace: true });
+      }
+    }
+  }, [searchParams, uniqueOrders]);
+
+  // Detect new incoming order for audio chime
   useEffect(() => {
     if (uniqueOrders && uniqueOrders.length > 0) {
       if (prevOrdersCountRef.current !== null && uniqueOrders.length > prevOrdersCountRef.current) {
@@ -53,44 +91,128 @@ export const AdminOrders = () => {
         );
         setNewOrderAlert(latestOrder);
       }
-      prevOrdersCountRef.current = orders.length;
-    } else if (orders) {
-      prevOrdersCountRef.current = orders.length;
+      prevOrdersCountRef.current = uniqueOrders.length;
+    } else if (uniqueOrders) {
+      prevOrdersCountRef.current = uniqueOrders.length;
     }
-  }, [orders, soundEnabled]);
+  }, [uniqueOrders, soundEnabled]);
 
-  // Handle opening payment modal
-  const handleOpenPaymentModal = (order, e) => {
+  // Open Bill Verification & Confirmation Modal
+  const handleOpenBillCheckModal = (order, e) => {
     if (e) e.stopPropagation();
-    setSelectedOrderForPayment(order);
-    setPaymentMethod('UPI');
-    setPaymentRef('');
+    setSelectedOrderForBillCheck(order);
+
+    const items = (order.items || []).map((item, idx) => ({
+      key: item._id || item.id || `item-${idx}`,
+      _id: item._id,
+      id: item.id,
+      productName: item.productName || item.productTitle || 'White Terry Towel',
+      size: item.size || '30x60',
+      hsnCode: item.hsnCode || '6302.60',
+      quantity: Math.max(0, parseInt(item.quantity, 10) || 0),
+      price: Math.max(0, Number(item.price) || 0),
+      subtotal: (Math.max(0, parseInt(item.quantity, 10) || 0)) * (Math.max(0, Number(item.price) || 0)),
+    }));
+
+    const calculatedSubtotal = items.reduce((sum, it) => sum + it.subtotal, 0) || Number(order.subtotal || order.totalAmount || 0);
+    const calculatedDiscount = Number(order.discount || 0);
+    const taxable = Math.max(0, calculatedSubtotal - calculatedDiscount);
+    const calculatedTax = Number(order.tax !== undefined ? order.tax : Math.round(taxable * 0.05));
+    const calculatedTotal = taxable + calculatedTax;
+
+    setBillCheckForm({
+      orderNumber: order.orderNumber || order.id,
+      customerName: order.customerDetails?.name || order.customer?.name || order.shippingAddress?.name || 'Customer',
+      businessName: order.customerDetails?.businessName || order.customer?.businessName || '',
+      phone: order.customerDetails?.phone || order.customer?.phone || order.shippingAddress?.phone || '',
+      email: order.customerDetails?.email || order.customer?.email || '',
+      gstin: order.customerDetails?.gstin || order.shippingAddress?.gstin || '',
+      address: order.deliveryDetails?.addressLine1 || order.shippingAddress?.address || '',
+      city: order.deliveryDetails?.city || order.shippingAddress?.city || 'Erode',
+      state: order.deliveryDetails?.state || order.shippingAddress?.state || 'Tamil Nadu',
+      stateCode: order.deliveryDetails?.stateCode || order.buyerStateCode || '33',
+      transporter: order.deliveryDetails?.transporter || 'VRL Logistics Cargo',
+      vehicleNo: order.deliveryDetails?.vehicleNo || 'TN 33 AB 1234',
+      items: items.length > 0 ? items : [{
+        key: 'item-0',
+        productName: 'White Towel Consignment',
+        size: 'Standard',
+        hsnCode: '6302.60',
+        quantity: order.totalPieces || 50,
+        price: 150,
+        subtotal: calculatedSubtotal,
+      }],
+      subtotal: calculatedSubtotal,
+      discount: calculatedDiscount,
+      tax: calculatedTax,
+      totalAmount: calculatedTotal,
+      paymentMethod: order.paymentDetails?.paymentMethod || order.paymentMethod || 'UPI',
+      paymentReference: order.paymentDetails?.paymentReference || '',
+    });
   };
 
-  // Handle confirming offline payment
-  const handleConfirmPayment = async (e) => {
-    e.preventDefault();
-    if (!selectedOrderForPayment) return;
+  // Line item change inside the Bill Verification Modal
+  const handleBillItemChange = (index, field, value) => {
+    setBillCheckForm((prev) => {
+      const items = [...prev.items];
+      const target = { ...items[index] };
+      if (field === 'quantity') {
+        target.quantity = value === '' ? '' : Math.max(0, parseInt(value, 10) || 0);
+      } else if (field === 'price') {
+        target.price = value === '' ? '' : Math.max(0, parseFloat(value) || 0);
+      } else {
+        target[field] = value;
+      }
+      const q = parseInt(target.quantity, 10) || 0;
+      const p = parseFloat(target.price) || 0;
+      target.subtotal = q * p;
+      items[index] = target;
 
-    setIsProcessingPayment(true);
-    const orderId = selectedOrderForPayment._id || selectedOrderForPayment.id;
-    const res = await confirmPayment(orderId, {
-      paymentMethod,
-      paymentReference: paymentRef,
-      amount: selectedOrderForPayment.totalAmount || selectedOrderForPayment.total,
+      const sub = items.reduce((s, it) => s + (Number(it.subtotal) || 0), 0);
+      const disc = Number(prev.discount || 0);
+      const tax = Math.round(Math.max(0, sub - disc) * 0.05);
+      const tot = Math.max(0, sub - disc) + tax;
+
+      return {
+        ...prev,
+        items,
+        subtotal: sub,
+        tax,
+        totalAmount: tot,
+      };
     });
+  };
 
-    setIsProcessingPayment(false);
+  // Handle Confirming the Bill & Generating the GST Tax Invoice
+  const handleConfirmBillAndGenerateInvoice = async (e) => {
+    e.preventDefault();
+    if (!selectedOrderForBillCheck || !billCheckForm) return;
+
+    setIsConfirmingBill(true);
+    const orderId = selectedOrderForBillCheck._id || selectedOrderForBillCheck.id || selectedOrderForBillCheck.orderNumber;
+
+    const payload = {
+      ...billCheckForm,
+      isCustomized: true,
+      paymentStatus: 'paid',
+      orderStatus: 'confirmed',
+      total: billCheckForm.totalAmount,
+    };
+
+    const res = await verifyAndConfirmBill(orderId, payload);
+    setIsConfirmingBill(false);
+
     if (res.success) {
       setFeedbackMessage({
         type: 'success',
-        text: `✓ Payment confirmed for Order #${selectedOrderForPayment.orderNumber || orderId}. Final Invoice ${res.invoice?.invoiceNumber || ''} generated!`,
+        text: `✓ Bill verified and confirmed for Order #${selectedOrderForBillCheck.orderNumber || orderId}! Final GST Tax Invoice ${res.invoice?.invoiceNumber || ''} generated & delivered to Buyer Portal.`,
       });
-      setSelectedOrderForPayment(null);
+      setSelectedOrderForBillCheck(null);
+      setBillCheckForm(null);
       fetchAdminOrders(filterStatus, filterPayment, filterInvoice, searchQuery);
-      setTimeout(() => setFeedbackMessage(null), 5000);
+      setTimeout(() => setFeedbackMessage(null), 6000);
     } else {
-      alert(`Error: ${res.error || 'Failed to confirm payment'}`);
+      alert(`Error confirming bill: ${res.error || 'Failed to confirm bill'}`);
     }
   };
 
@@ -109,7 +231,7 @@ export const AdminOrders = () => {
     }
   };
 
-  // Compute stats fallback if not provided by backend stats object
+  // Compute stats fallback
   const computedStats = orderStats || {
     totalOrders: uniqueOrders.length,
     newOrders: uniqueOrders.filter(o => (o.orderStatus || '').toLowerCase() === 'new').length,
@@ -126,7 +248,7 @@ export const AdminOrders = () => {
         <div>
           <h1 className="text-headline-sm font-bold text-primary">Wholesale Purchase Orders</h1>
           <p className="text-body-sm text-on-surface-variant">
-            Manage wholesale orders, verify offline payments, update dispatch status, and issue tax invoices.
+            Check placed bills, verify payments, generate official GST invoices, and update consignments.
           </p>
         </div>
 
@@ -136,7 +258,7 @@ export const AdminOrders = () => {
             onClick={() => {
               const next = !soundEnabled;
               setSoundEnabled(next);
-              if (next) playNewOrderSound();
+              if (next) playTestSound();
             }}
             className={`px-3 py-1.5 rounded-lg border text-label-sm font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
               soundEnabled
@@ -185,7 +307,7 @@ export const AdminOrders = () => {
         {/* Paid Orders */}
         <div className="bg-[#E6F5F0] p-3.5 rounded-xl border border-secondary-fixed shadow-xs space-y-1">
           <div className="flex items-center justify-between text-secondary">
-            <span className="text-[11px] font-bold uppercase tracking-wider">Paid Orders</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider">Paid / Invoiced</span>
             <span className="material-symbols-outlined text-lg">verified</span>
           </div>
           <div className="text-headline-sm font-bold text-secondary font-mono">{computedStats.paidOrders || 0}</div>
@@ -244,7 +366,7 @@ export const AdminOrders = () => {
             className="bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-label-sm text-primary font-semibold outline-none focus:border-primary"
           >
             <option value="ALL">All Order Statuses</option>
-            <option value="new">New</option>
+            <option value="new">New Placed Orders</option>
             <option value="confirmed">Confirmed</option>
             <option value="processing">Processing</option>
             <option value="ready_for_dispatch">Ready for Dispatch</option>
@@ -260,8 +382,8 @@ export const AdminOrders = () => {
             className="bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-label-sm text-primary font-semibold outline-none focus:border-primary"
           >
             <option value="ALL">All Payments</option>
-            <option value="pending">Payment: Pending</option>
-            <option value="paid">Payment: Paid</option>
+            <option value="pending">Payment: Pending Verification</option>
+            <option value="paid">Payment: Paid &amp; Confirmed</option>
           </select>
 
           {/* Invoice Status */}
@@ -272,7 +394,7 @@ export const AdminOrders = () => {
           >
             <option value="ALL">All Invoices</option>
             <option value="generated">Invoice: Generated</option>
-            <option value="not_generated">Invoice: Not Generated</option>
+            <option value="not_generated">Invoice: Pending</option>
           </select>
 
           {/* Clear Filters button */}
@@ -293,36 +415,10 @@ export const AdminOrders = () => {
         </div>
       </div>
 
-      {/* New Live Order Alert Flash Banner */}
-      {newOrderAlert && (
-        <div className="p-4 bg-[#E6F5F0] border-2 border-secondary-fixed rounded-2xl flex items-center justify-between gap-3 shadow-md animate-bounce">
-          <div className="flex items-center gap-3">
-            <span className="w-10 h-10 rounded-full bg-secondary text-white flex items-center justify-center font-bold">
-              <span className="material-symbols-outlined">notifications_active</span>
-            </span>
-            <div>
-              <p className="font-bold text-primary text-body-md">
-                🚨 NEW ORDER #{newOrderAlert.orderNumber || newOrderAlert.id} RECEIVED!
-              </p>
-              <p className="text-xs text-secondary font-semibold">
-                Buyer: {newOrderAlert.customerDetails?.businessName || newOrderAlert.customerDetails?.name || 'Customer'} • Total: ₹{Number(newOrderAlert.totalAmount || newOrderAlert.total || 0).toLocaleString('en-IN')}
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setNewOrderAlert(null)}
-            className="px-3 py-1 bg-secondary text-white rounded-lg text-label-sm font-bold hover:bg-secondary/90 cursor-pointer"
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
-
       {/* Success Notification Banner */}
       {feedbackMessage && (
         <div
-          className={`p-4 rounded-xl border flex items-center gap-2 text-body-sm font-medium ${
+          className={`p-4 rounded-xl border flex items-center gap-2 text-body-sm font-medium animate-in fade-in ${
             feedbackMessage.type === 'success'
               ? 'bg-[#E6F5F0] border-secondary-fixed text-secondary'
               : 'bg-red-50 border-red-200 text-red-700'
@@ -423,30 +519,31 @@ export const AdminOrders = () => {
                       </select>
                     </div>
 
-                    {/* Payment Status / Action */}
-                    {isPaid ? (
+                    {/* Primary Bill Verification & Payment Confirmation Button */}
+                    {!isPaid ? (
+                      <button
+                        type="button"
+                        onClick={(e) => handleOpenBillCheckModal(order, e)}
+                        className="px-3.5 py-1.5 bg-secondary hover:bg-secondary/90 text-white text-label-sm font-bold rounded-lg flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
+                        title="Admin: Check the bill, verify details, and confirm payment & invoice"
+                      >
+                        <span className="material-symbols-outlined text-sm">fact_check</span>
+                        <span>Check Bill &amp; Confirm</span>
+                      </button>
+                    ) : (
                       <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-label-sm font-bold bg-[#E6F5F0] text-secondary border border-secondary-fixed">
                         <span className="material-symbols-outlined text-sm">verified</span>
                         <span>Paid ({order.invoiceNumber || 'Invoiced'})</span>
                       </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={(e) => handleOpenPaymentModal(order, e)}
-                        className="px-3.5 py-1.5 bg-secondary hover:bg-secondary/90 text-white text-label-sm font-bold rounded-lg flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
-                      >
-                        <span className="material-symbols-outlined text-sm">task_alt</span>
-                        <span>Confirm Payment Received</span>
-                      </button>
                     )}
 
-                    {/* Admin Edit / View Bill Details */}
+                    {/* View / Edit GST Bill Link */}
                     <Link
                       to={`/invoice/${order._id || orderNum}`}
                       className="px-3 py-1.5 bg-primary-container hover:bg-primary text-white text-label-sm font-bold rounded-lg flex items-center gap-1 shadow-sm transition-all"
-                      title="Admin: Edit bill details before or after confirming payment"
+                      title="View or edit official tax bill"
                     >
-                      <span className="material-symbols-outlined text-sm">edit_note</span>
+                      <span className="material-symbols-outlined text-sm">receipt_long</span>
                       <span>{isPaid ? 'View / Edit Bill' : 'Edit Bill Draft'}</span>
                     </Link>
                   </div>
@@ -493,113 +590,221 @@ export const AdminOrders = () => {
         </div>
       )}
 
-      {/* Admin Payment Confirmation Modal */}
-      {selectedOrderForPayment && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant p-6 max-w-md w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
-            <div className="flex justify-between items-center pb-2 border-b border-surface-container">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-secondary text-2xl">account_balance_wallet</span>
-                <h3 className="font-title-md text-title-md font-bold text-primary">
-                  Confirm Payment Received
-                </h3>
+      {/* Comprehensive Bill Verification & Confirmation Modal */}
+      {selectedOrderForBillCheck && billCheckForm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant p-6 max-w-3xl w-full shadow-2xl space-y-5 my-6 animate-in fade-in zoom-in-95">
+            {/* Modal Header */}
+            <div className="flex justify-between items-start pb-3 border-b border-surface-container">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-secondary text-2xl">fact_check</span>
+                  <h3 className="text-title-lg font-bold text-primary">
+                    Check Bill &amp; Confirm Order #{billCheckForm.orderNumber}
+                  </h3>
+                </div>
+                <p className="text-xs text-on-surface-variant mt-0.5">
+                  Inspect buyer consignment details, verify prices/quantities, and confirm payment to issue the final GST Tax Invoice.
+                </p>
               </div>
               <button
                 type="button"
-                onClick={() => setSelectedOrderForPayment(null)}
-                className="text-on-surface-variant hover:text-primary cursor-pointer"
+                onClick={() => {
+                  setSelectedOrderForBillCheck(null);
+                  setBillCheckForm(null);
+                }}
+                className="p-1 text-on-surface-variant hover:text-primary rounded-lg cursor-pointer"
               >
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
 
-            <div className="p-4 bg-surface-container-low rounded-xl border border-outline-variant space-y-2 text-body-sm">
-              <p className="text-primary font-semibold">
-                Confirm that payment of{' '}
-                <strong className="text-secondary font-mono text-headline-sm">
-                  ₹{(selectedOrderForPayment.totalAmount || selectedOrderForPayment.total || 0).toLocaleString('en-IN')}
-                </strong>{' '}
-                has been received for Order #{selectedOrderForPayment.orderNumber || selectedOrderForPayment.id}?
-              </p>
-              <p className="text-xs text-on-surface-variant">
-                Customer: {selectedOrderForPayment.customerDetails?.name || selectedOrderForPayment.customer?.name} (
-                {selectedOrderForPayment.customerDetails?.businessName || 'Wholesale Buyer'})
-              </p>
-            </div>
-
-            <form onSubmit={handleConfirmPayment} className="space-y-4">
-              <div>
-                <label className="block font-label-md text-on-surface-variant mb-1 font-semibold">
-                  Payment Method Received
-                </label>
-                <select
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value)}
-                  className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-body-md text-primary outline-none focus:ring-1 focus:ring-primary"
-                >
-                  <option value="UPI">UPI (GPay / PhonePe / Paytm / BHIM)</option>
-                  <option value="Bank Transfer">Bank Transfer (RTGS / NEFT / IMPS)</option>
-                  <option value="Cash">Cash (Ex-Mill Settlement)</option>
-                  <option value="Other">Other Wholesale Account</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-label-md text-on-surface-variant mb-1 font-semibold">
-                  Bank Reference / UTR Number (Optional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. UTR-982347102938"
-                  value={paymentRef}
-                  onChange={(e) => setPaymentRef(e.target.value)}
-                  className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-body-md text-primary font-mono outline-none focus:ring-1 focus:ring-primary"
-                />
-              </div>
-
-              <div className="p-3 bg-[#E6F5F0] rounded-lg border border-secondary-fixed text-xs text-secondary space-y-2">
+            <form onSubmit={handleConfirmBillAndGenerateInvoice} className="space-y-4">
+              {/* Buyer & Consignment Info Banner */}
+              <div className="p-4 bg-surface-container-low rounded-xl border border-outline-variant grid grid-cols-1 sm:grid-cols-2 gap-3 text-body-sm">
                 <div>
-                  <p className="font-bold">Automated Invoice Generation:</p>
-                  <p>
-                    Upon confirmation, the order will be marked as <strong>PAID</strong> and a <strong>Final GST Tax Invoice</strong> will be issued to the buyer.
+                  <span className="text-[11px] font-bold text-outline uppercase block mb-0.5">Buyer / Consignee:</span>
+                  <p className="font-bold text-primary">{billCheckForm.businessName || billCheckForm.customerName}</p>
+                  <p className="text-xs text-on-surface-variant">Phone: {billCheckForm.phone} • Email: {billCheckForm.email}</p>
+                  <p className="text-xs text-on-surface-variant">
+                    GSTIN: <span className="font-mono font-bold text-primary">{billCheckForm.gstin || 'Unregistered'}</span>
                   </p>
                 </div>
-                <div className="pt-1.5 border-t border-secondary-fixed/50 flex items-center justify-between">
-                  <span className="text-[11px] font-medium text-on-surface-variant">Need to edit buyer or HSN details first?</span>
-                  <Link
-                    to={`/invoice/${selectedOrderForPayment._id || selectedOrderForPayment.orderNumber || selectedOrderForPayment.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-bold text-primary hover:underline text-[11px] flex items-center gap-0.5"
-                  >
-                    <span>Edit Bill Details</span>
-                    <span className="material-symbols-outlined text-xs">open_in_new</span>
-                  </Link>
+
+                <div>
+                  <span className="text-[11px] font-bold text-outline uppercase block mb-0.5">Logistics &amp; Destination:</span>
+                  <p className="text-xs text-primary font-medium">{billCheckForm.address}, {billCheckForm.city}, {billCheckForm.state}</p>
+                  <p className="text-xs text-on-surface-variant mt-0.5">
+                    Carrier: <strong className="text-primary">{billCheckForm.transporter}</strong>
+                  </p>
+                  <p className="text-xs text-on-surface-variant">
+                    Place of Supply: <strong className="text-primary">{billCheckForm.state} ({billCheckForm.stateCode})</strong>
+                  </p>
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedOrderForPayment(null)}
-                  className="px-4 py-2 rounded-lg border border-outline-variant text-primary font-bold text-label-md hover:bg-surface-container cursor-pointer transition-all"
+              {/* Itemized Table Breakdown */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-label-sm font-bold text-outline uppercase">
+                    Consignment Items &amp; Rates (Verified for GST Invoice)
+                  </span>
+                  <span className="text-xs text-secondary font-bold font-mono bg-secondary-fixed/40 px-2 py-0.5 rounded">
+                    HSN 6302.60 • 5% GST
+                  </span>
+                </div>
+
+                <div className="border border-outline-variant rounded-xl overflow-hidden">
+                  <table className="w-full text-body-sm text-left">
+                    <thead className="bg-surface-container text-label-sm text-primary font-bold">
+                      <tr>
+                        <th className="p-2.5">Product &amp; Size</th>
+                        <th className="p-2.5 text-center">Qty (Pcs)</th>
+                        <th className="p-2.5 text-right">Rate (₹)</th>
+                        <th className="p-2.5 text-right">Subtotal (₹)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-outline-variant bg-surface-container-lowest">
+                      {billCheckForm.items?.map((item, idx) => (
+                        <tr key={idx} className="hover:bg-surface-container-low">
+                          <td className="p-2.5">
+                            <span className="font-bold text-primary block">{item.productName}</span>
+                            <span className="text-xs text-on-surface-variant">Size: {item.size} • HSN: {item.hsnCode}</span>
+                          </td>
+                          <td className="p-2.5 text-center font-mono">
+                            <input
+                              type="number"
+                              min="1"
+                              value={item.quantity}
+                              onChange={(e) => handleBillItemChange(idx, 'quantity', e.target.value)}
+                              className="w-20 text-center font-bold bg-surface-container border border-outline-variant rounded px-2 py-1 outline-none focus:border-primary"
+                            />
+                          </td>
+                          <td className="p-2.5 text-right font-mono">
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={item.price}
+                              onChange={(e) => handleBillItemChange(idx, 'price', e.target.value)}
+                              className="w-24 text-right font-bold bg-surface-container border border-outline-variant rounded px-2 py-1 outline-none focus:border-primary"
+                            />
+                          </td>
+                          <td className="p-2.5 text-right font-mono font-bold text-primary">
+                            ₹{(item.subtotal || item.quantity * item.price).toLocaleString('en-IN')}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Financial Totals Breakdown */}
+              <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant space-y-1.5 text-body-sm">
+                <div className="flex justify-between text-on-surface-variant">
+                  <span>Gross Subtotal:</span>
+                  <span className="font-mono font-medium">₹{Number(billCheckForm.subtotal || 0).toLocaleString('en-IN')}.00</span>
+                </div>
+                {Number(billCheckForm.discount || 0) > 0 && (
+                  <div className="flex justify-between text-secondary">
+                    <span>Wholesale Rebate / Discount:</span>
+                    <span className="font-mono font-medium">- ₹{Number(billCheckForm.discount).toLocaleString('en-IN')}.00</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-on-surface-variant">
+                  <span>GST (5% Intra/Inter State):</span>
+                  <span className="font-mono font-medium">+ ₹{Number(billCheckForm.tax || 0).toLocaleString('en-IN')}.00</span>
+                </div>
+                <div className="flex justify-between text-primary font-bold text-title-md border-t border-surface-container pt-2 mt-1">
+                  <span>Grand Total Net Payable:</span>
+                  <span className="font-mono text-secondary text-headline-sm">
+                    ₹{Number(billCheckForm.totalAmount || 0).toLocaleString('en-IN')}.00
+                  </span>
+                </div>
+              </div>
+
+              {/* Payment Settlement Information */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label className="block font-label-md text-on-surface-variant mb-1 font-semibold">
+                    Payment Method Received
+                  </label>
+                  <select
+                    value={billCheckForm.paymentMethod}
+                    onChange={(e) => setBillCheckForm({ ...billCheckForm, paymentMethod: e.target.value })}
+                    className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-body-md text-primary outline-none focus:ring-1 focus:ring-primary"
+                  >
+                    <option value="UPI">UPI (GPay / PhonePe / Paytm / BHIM)</option>
+                    <option value="Bank Transfer">Bank Transfer (RTGS / NEFT / IMPS)</option>
+                    <option value="Cash">Cash (Ex-Mill Settlement)</option>
+                    <option value="Other">Other Wholesale Account</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-label-md text-on-surface-variant mb-1 font-semibold">
+                    Bank Reference / UTR Number (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. UTR-982347102938"
+                    value={billCheckForm.paymentReference}
+                    onChange={(e) => setBillCheckForm({ ...billCheckForm, paymentReference: e.target.value })}
+                    className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-body-md text-primary font-mono outline-none focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+              </div>
+
+              {/* Automated Invoicing Guarantee Note */}
+              <div className="p-3 bg-[#E6F5F0] rounded-xl border border-secondary-fixed text-xs text-secondary flex items-start gap-2">
+                <span className="material-symbols-outlined text-base mt-0.5 shrink-0">verified</span>
+                <div>
+                  <p className="font-bold">Automated GST Tax Invoice Issuance:</p>
+                  <p>
+                    Clicking <strong>Confirm Bill &amp; Generate GST Invoice</strong> marks the order as <strong>Confirmed &amp; Paid</strong>, automatically produces the official GST Tax Invoice with SSTextiles details, and makes it instantly accessible in the buyer portal.
+                  </p>
+                </div>
+              </div>
+
+              {/* Modal Action Buttons */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                <Link
+                  to={`/invoice/${selectedOrderForBillCheck._id || selectedOrderForBillCheck.orderNumber || selectedOrderForBillCheck.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline text-xs font-bold flex items-center gap-1"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isProcessingPayment}
-                  className="px-5 py-2 rounded-lg bg-secondary hover:bg-secondary/90 text-white font-bold text-label-md shadow flex items-center gap-2 cursor-pointer transition-all disabled:opacity-50"
-                >
-                  {isProcessingPayment ? (
-                    <span>Confirming...</span>
-                  ) : (
-                    <>
-                      <span className="material-symbols-outlined text-sm">verified</span>
-                      <span>Confirm Payment</span>
-                    </>
-                  )}
-                </button>
+                  <span className="material-symbols-outlined text-sm">open_in_new</span>
+                  <span>Open Full Invoice Editor</span>
+                </Link>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedOrderForBillCheck(null);
+                      setBillCheckForm(null);
+                    }}
+                    className="px-4 py-2 rounded-lg border border-outline-variant text-primary font-bold text-label-md hover:bg-surface-container cursor-pointer transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isConfirmingBill}
+                    className="px-5 py-2.5 rounded-lg bg-secondary hover:bg-secondary/90 text-white font-bold text-label-md shadow-md flex items-center gap-2 cursor-pointer transition-all disabled:opacity-50"
+                  >
+                    {isConfirmingBill ? (
+                      <span>Generating Invoice...</span>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-base">verified</span>
+                        <span>✓ Confirm Bill &amp; Generate GST Invoice</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -725,12 +930,12 @@ export const AdminOrders = () => {
                   onClick={() => {
                     const ord = selectedOrderForDetails;
                     setSelectedOrderForDetails(null);
-                    handleOpenPaymentModal(ord);
+                    handleOpenBillCheckModal(ord);
                   }}
                   className="px-5 py-2 bg-secondary text-white rounded-lg font-bold text-label-md flex items-center gap-1.5 shadow cursor-pointer hover:bg-secondary/90"
                 >
-                  <span className="material-symbols-outlined text-sm">task_alt</span>
-                  <span>Confirm Payment</span>
+                  <span className="material-symbols-outlined text-sm">fact_check</span>
+                  <span>Check Bill &amp; Confirm</span>
                 </button>
               )}
             </div>

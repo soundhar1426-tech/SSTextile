@@ -366,16 +366,19 @@ export const Dashboard = () => {
                   </div>
                 </div>
 
-                {/* Actions Cluster */}
-                <div className="pt-3 border-t border-surface-container flex flex-col space-y-2">
                   <Link
-                    to={isPaid ? `/invoice/${order._id || orderNum}` : `/admin/orders`}
-                    className="w-full py-2 px-3 rounded-lg bg-primary-container text-on-primary font-label-lg text-label-lg font-bold flex items-center justify-center space-x-2 hover:bg-[#1E3A5F] active:scale-95 transition-transform"
+                    to={isPaid ? `/invoice/${order._id || orderNum}` : `/admin/orders?checkOrder=${order._id || orderNum}`}
+                    className={`w-full py-2 px-3 rounded-lg font-label-lg text-label-lg font-bold flex items-center justify-center space-x-2 active:scale-95 transition-all shadow-sm ${
+                      isPaid
+                        ? 'bg-primary text-white hover:bg-primary/90'
+                        : 'bg-secondary text-white hover:bg-secondary/90'
+                    }`}
                   >
-                    <span className="material-symbols-outlined text-[18px]">receipt</span>
-                    <span>{isPaid ? 'View Tax Invoice' : 'Manage & Confirm Payment'}</span>
+                    <span className="material-symbols-outlined text-[18px]">
+                      {isPaid ? 'receipt_long' : 'fact_check'}
+                    </span>
+                    <span>{isPaid ? 'View Tax Invoice' : 'Check Bill & Confirm'}</span>
                   </Link>
-                </div>
               </article>
             );
           })

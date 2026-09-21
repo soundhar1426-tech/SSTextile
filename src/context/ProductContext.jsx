@@ -27,11 +27,22 @@ export const deduplicateCatalog = (rawProducts) => {
 
   rawProducts.forEach((prod) => {
     if (!prod) return;
-    const nameKey = (prod.name || prod.title || 'White Towels').toLowerCase().trim();
+    const pKey = String(prod._id || prod.id || prod.name || Math.random()).trim();
 
     // Normalize sizes for this incoming product
     const sizeMap = new Map();
-    const incomingSizes = Array.isArray(prod.sizes) ? prod.sizes : [];
+    const incomingSizes = Array.isArray(prod.sizes) && prod.sizes.length > 0
+      ? prod.sizes
+      : [{
+          size: prod.size || '50x100',
+          dimension: prod.dimension || (prod.size ? `${prod.size} cm` : '50x100 cm'),
+          price: Number(prod.price ?? 220),
+          stock: Number(prod.stock ?? 350),
+          grams: Number(prod.grams ?? 300),
+          gsm: Number(prod.gsm ?? 600),
+          weightKg: Number(prod.weightKg ?? 0.3),
+          active: prod.active !== false,
+        }];
 
     incomingSizes.forEach((s) => {
       if (!s) return;
@@ -40,22 +51,53 @@ export const deduplicateCatalog = (rawProducts) => {
         .replace(/cm|inch|in/gi, '')
         .replace(/[×*X\-]/g, 'x')
         .replace(/\s+/g, '')
-        .trim();
+        .trim() || '50x100';
 
-      if (!dimKey) return;
+      const g = Number(s.grams) || Math.round(Number(s.weightKg || 0.3) * 1000) || Number(prod.grams || 300);
+      const wKg = Number(s.weightKg) || Number((g / 1000).toFixed(3));
+      const p = Number(s.price !== undefined ? s.price : (prod.price ?? 220));
+      const stk = Number(s.stock !== undefined ? s.stock : (prod.stock ?? 350));
+      const gsmVal = Number(s.gsm || prod.gsm || 600);
+
       sizeMap.set(dimKey, {
         ...s,
+        id: s.id || s._id || `sz-${dimKey}`,
+        _id: s._id || s.id || `sz-${dimKey}`,
         size: s.size || dimKey,
         dimension: s.dimension || `${dimKey} cm`,
-        stock: Number(s.stock ?? 0),
-        price: Number(s.price ?? 0),
+        stock: stk,
+        price: p,
+        grams: g,
+        gsm: gsmVal,
+        weightKg: wKg,
+        active: s.active !== false,
       });
     });
 
     const uniqueSizes = Array.from(sizeMap.values()).sort((a, b) => (Number(a.price) || 0) - (Number(b.price) || 0));
+    const firstSize = uniqueSizes[0] || {};
 
-    productMap.set(nameKey, {
+    const priceVal = prod.price !== undefined ? Number(prod.price) : Number(firstSize.price ?? 220);
+    const stockVal = prod.stock !== undefined ? Number(prod.stock) : Number(firstSize.stock ?? 350);
+    const dimVal = prod.dimension || firstSize.dimension || (firstSize.size ? `${firstSize.size} cm` : '50x100 cm');
+    const sizeVal = prod.size || firstSize.size || dimVal.replace(/cm|inch|in/gi, '').replace(/[×*X\-]/g, 'x').replace(/\s+/g, '').trim() || '50x100';
+    const gramsVal = prod.grams !== undefined ? Number(prod.grams) : Number(firstSize.grams ?? 300);
+    const gsmVal = prod.gsm !== undefined ? Number(prod.gsm) : Number(firstSize.gsm ?? 600);
+    const weightKgVal = Number((gramsVal / 1000).toFixed(3));
+
+    productMap.set(pKey, {
       ...prod,
+      id: prod.id || prod._id || pKey,
+      _id: prod._id || prod.id || pKey,
+      name: prod.name || prod.title || 'White Towel',
+      title: prod.title || prod.name || 'White Towel',
+      price: priceVal,
+      stock: stockVal,
+      dimension: dimVal,
+      size: sizeVal,
+      grams: gramsVal,
+      gsm: gsmVal,
+      weightKg: weightKgVal,
       sizes: uniqueSizes,
     });
   });

@@ -16,6 +16,9 @@ const formatProductResponse = (product, sizes = []) => {
 
   const validImages = product.images && product.images.length > 0 && product.images[0] ? product.images : [DEFAULT_TOWEL_IMAGE];
   const primaryImage = validImages[0];
+  const firstSize = activeSizes[0] || null;
+  const firstGrams = firstSize ? (firstSize.grams || (firstSize.weightKg ? Math.round(firstSize.weightKg * 1000) : 300)) : 300;
+  const firstWeightKg = firstSize ? (firstSize.weightKg || Number((firstGrams / 1000).toFixed(3))) : 0.3;
 
   return {
     id: product._id,
@@ -36,6 +39,13 @@ const formatProductResponse = (product, sizes = []) => {
     totalStock,
     minPrice,
     maxPrice,
+    price: firstSize ? firstSize.price : 0,
+    stock: firstSize ? firstSize.stock : 0,
+    size: firstSize ? firstSize.size : '50x100',
+    dimension: firstSize ? `${firstSize.size} cm` : '50x100 cm',
+    grams: firstGrams,
+    gsm: firstSize ? (firstSize.gsm || 600) : 600,
+    weightKg: firstWeightKg,
     sizes: activeSizes.map((s) => {
       const grams = s.grams || (s.weightKg ? Math.round(s.weightKg * 1000) : 100);
       const weightKg = s.weightKg || Number((grams / 1000).toFixed(3));

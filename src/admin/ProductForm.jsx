@@ -27,7 +27,7 @@ const SLOT_LABELS = [
 export const ProductForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { createProduct, updateProduct, deleteProduct, getProductById, products } = useProducts();
+  const { createProduct, updateProduct, deleteProduct, getProductById, fetchProducts, fetchInventorySummary, products } = useProducts();
 
   const multiFileInputRef = useRef(null);
   const singleSlotFileInputRef = useRef(null);
@@ -425,10 +425,14 @@ export const ProductForm = () => {
     setIsSubmitting(false);
 
     if (result.success) {
-      setSuccessBanner('✓ Product saved successfully!');
+      try {
+        await fetchProducts();
+        await fetchInventorySummary();
+      } catch (e) {}
+      setSuccessBanner('✓ Product saved and catalog updated successfully!');
       setTimeout(() => {
         navigate('/admin/products');
-      }, 800);
+      }, 500);
     } else {
       setErrorMessage(result.error || 'Failed to save product.');
     }

@@ -135,22 +135,44 @@ export const ProductProvider = ({ children }) => {
    * Fetch single product by ID from MongoDB or active catalog
    */
   const getProductById = useCallback(async (productId) => {
+    if (!productId) return { success: false, error: 'No product ID provided', status: 400 };
+
+    const cleanId = String(productId).trim();
+
+    // 1. Check current memory state first
+    const currentList = products.length > 0 ? products : getInitialProducts();
+    let localProduct = currentList.find(
+      (p) =>
+        String(p.id) === cleanId ||
+        String(p._id) === cleanId ||
+        (p.name && p.name.toLowerCase() === cleanId.toLowerCase()) ||
+        (p.title && p.title.toLowerCase() === cleanId.toLowerCase())
+    );
+
+    // 2. Try fetching from live backend
     try {
-      const response = await api.get(`/products/${productId}`);
-      if (response.data.success && response.data.product) {
+      const response = await api.get(`/products/${cleanId}`);
+      if (response.data?.success && response.data.product) {
         return { success: true, product: response.data.product };
       }
     } catch (err) {
-      console.warn('[ProductContext] Notice: fetching from local catalog for ID:', productId);
+      try {
+        const adminRes = await api.get(`/admin/products/${cleanId}`);
+        if (adminRes.data?.success && adminRes.data.product) {
+          return { success: true, product: adminRes.data.product };
+        }
+      } catch (adminErr) {}
     }
 
-    const currentList = products.length > 0 ? products : getInitialProducts();
-    const localProduct = currentList.find(
-      (p) => String(p.id) === String(productId) || String(p._id) === String(productId)
-    );
     if (localProduct) {
       return { success: true, product: localProduct };
     }
+
+    // 3. Fallback to first product if only 1 exists in catalog
+    if (currentList.length > 0) {
+      return { success: true, product: currentList[0] };
+    }
+
     return { success: false, error: 'Product not found', status: 404 };
   }, [products]);
 

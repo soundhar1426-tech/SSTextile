@@ -456,10 +456,12 @@ export const ProductProvider = ({ children }) => {
       await fetchInventorySummary();
       return { success: true, message: res.data?.message };
     } catch (err) {
-      console.warn('[ProductContext] Product deleted locally (backend sync notice):', err.message);
+      console.error('[ProductContext] Error deleting product from backend:', err.response?.data?.message || err.message);
       await fetchProducts(true);
-      await fetchInventorySummary();
-      return { success: true };
+      return {
+        success: false,
+        error: err.response?.data?.message || 'Failed to delete product from server.',
+      };
     }
   };
 

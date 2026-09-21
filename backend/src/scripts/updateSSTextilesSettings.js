@@ -32,7 +32,7 @@ async function updateToSSTextiles() {
         bankName: 'State Bank of India',
         branch: 'Erode Main',
         accountName: 'SSTextiles',
-        accountNumber: '000012345678901',
+        accountNumber: '30001234567',
         ifsc: 'SBIN0001234',
         accountType: 'Current Account',
       },

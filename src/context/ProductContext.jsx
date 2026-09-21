@@ -22,50 +22,42 @@ const getInitialMillSettings = () => {
 };
 
 export const deduplicateCatalog = (rawProducts) => {
-  if (!Array.isArray(rawProducts)) return initialProducts || [];
+  if (!Array.isArray(rawProducts) || rawProducts.length === 0) return initialProducts || [];
   const productMap = new Map();
 
   rawProducts.forEach((prod) => {
     if (!prod) return;
     const nameKey = (prod.name || prod.title || 'White Towels').toLowerCase().trim();
-    const existing = productMap.get(nameKey);
 
-    // Normalize and deduplicate sizes for this product
+    // Normalize sizes for this incoming product
     const sizeMap = new Map();
-    const existingSizes = existing ? (existing.sizes || []) : [];
-    const incomingSizes = prod.sizes || [];
+    const incomingSizes = Array.isArray(prod.sizes) ? prod.sizes : [];
 
-    [...existingSizes, ...incomingSizes].forEach((s) => {
+    incomingSizes.forEach((s) => {
       if (!s) return;
       const dimKey = String(s.size || s.dimension || '')
         .toLowerCase()
         .replace(/cm|inch|in/gi, '')
-        .replace(/[×*X]/g, 'x')
+        .replace(/[×*X\-]/g, 'x')
         .replace(/\s+/g, '')
         .trim();
 
       if (!dimKey) return;
-      if (!sizeMap.has(dimKey)) {
-        sizeMap.set(dimKey, s);
-      } else {
-        const cur = sizeMap.get(dimKey);
-        if (Number(s.stock || 0) > Number(cur.stock || 0) || (s.grams && !cur.grams)) {
-          sizeMap.set(dimKey, { ...cur, ...s });
-        }
-      }
+      sizeMap.set(dimKey, {
+        ...s,
+        size: s.size || dimKey,
+        dimension: s.dimension || `${dimKey} cm`,
+        stock: Number(s.stock ?? 0),
+        price: Number(s.price ?? 0),
+      });
     });
 
     const uniqueSizes = Array.from(sizeMap.values()).sort((a, b) => (Number(a.price) || 0) - (Number(b.price) || 0));
 
-    if (!existing) {
-      productMap.set(nameKey, { ...prod, sizes: uniqueSizes });
-    } else {
-      productMap.set(nameKey, {
-        ...existing,
-        ...prod,
-        sizes: uniqueSizes,
-      });
-    }
+    productMap.set(nameKey, {
+      ...prod,
+      sizes: uniqueSizes,
+    });
   });
 
   return Array.from(productMap.values());

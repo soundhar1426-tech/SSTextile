@@ -1,23 +1,32 @@
 export const initialProducts = [
   {
     id: "white-towels",
+    _id: "white-towels",
     title: "White Towels",
     name: "White Towels",
-    subtitle: "Direct Weaving Mill Cotton Plain White Terry Towels. Fast-absorb yarn.",
+    description: "Direct Weaving Mill 100% Combed Ringspun Cotton Plain White Terry Towels. Double needle hemmed, fast-absorb yarn for bulk wholesale ordering.",
+    subtitle: "Direct Weaving Mill 100% Combed Ringspun Cotton Plain White Terry Towels. Double needle hemmed, fast-absorb yarn for bulk wholesale ordering.",
     category: "White Towels",
-    gsmRange: "450 - 700 GSM",
+    gsmRange: "500 - 650 GSM",
     weaveType: "2/20s Ring Spun",
     fastness: "Grade 4+ Cl",
-    material: "Cotton",
+    material: "100% Combed Ringspun Cotton",
     border: "Dobby Ribbed Hem",
     hsnCode: "6302.60",
     image: "https://lh3.googleusercontent.com/aida-public/AB6AXuCCdKqsvfuy2yau3AySGBI8zrrt1U9ghlW3X5wsoSzGBmztb7AyEZEhYV6EL6hsHNIBYMWtdL482GVLBRWvqbV0yTmpIlrmoJph838qaVWq9l1eDuxkE1I__-yKdS3oaLCCRrHpvWejMDeHWnT87rkOyHa0EKZu56Gbw6hoaMcb3hM9wIo5pCxDGGx6g7JtSEJY9wy9ZOXaAhzH4nphAIFBcgFZ6Bb85_5NECSf6XaYsx6x0NyYuSCwXw",
+    images: [
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuCCdKqsvfuy2yau3AySGBI8zrrt1U9ghlW3X5wsoSzGBmztb7AyEZEhYV6EL6hsHNIBYMWtdL482GVLBRWvqbV0yTmpIlrmoJph838qaVWq9l1eDuxkE1I__-yKdS3oaLCCRrHpvWejMDeHWnT87rkOyHa0EKZu56Gbw6hoaMcb3hM9wIo5pCxDGGx6g7JtSEJY9wy9ZOXaAhzH4nphAIFBcgFZ6Bb85_5NECSf6XaYsx6x0NyYuSCwXw",
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuA4G6yJKWXrsFcKnRVjY4iUeQqaDk4bnROUb1QZsoFAMBBxbVCMHmiGkwcXOhvfDMxeuAHEPpxaM-hZxHrTfmx3zka_ed-0v15OyyV0sSW4oWhC9VzT8M8cxOkv9BX9Hd-f9-Gi5XmB1SqNGEIhriYPqsbo_hEcLU8WZEo_fcNleWS1-uA6bKz7nLhIayTVKmcOwq6fJZn2kaA_GRkWOXz0dUrsNFQH3IO9lAE2TAC3he6E378VTZmQaA",
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuCoDYdD9ozOqIkie8Ri4dtlGbS54d2Pyh1nFBU5yIIRZB5DJvm3ql4Y858m1_4WsL3K0A4cLOxTIG6fNWzBJZ_QI6WZkhnWDmTQsm1mY-TBGsDrhDUyssfPYFRf25byd1ojjtYFtp8i7AZ0cUCebRzVLdwV1XZ3T635MNtPTiHY_uu9TRt55-_B8qF--iLFVdULjBex9lnRvmRFiF5TZ6y3wUz8oWevpWo64cOO__kNWnCe5NrnuFBMrw"
+    ],
     status: "Ready to Dispatch",
     isGstCompliant: true,
+    active: true,
     sizes: [
       {
         id: "sz-20-40",
-        dimension: "20×40 cm",
+        size: "20x40",
+        dimension: "20x40 cm",
         inches: "8×16 in",
         widthCm: 20,
         lengthCm: 40,
@@ -27,11 +36,13 @@ export const initialProducts = [
         stock: 600,
         moq: 40,
         weightKg: 0.036,
-        status: "Optimal Stock"
+        status: "Optimal Stock",
+        active: true
       },
       {
         id: "sz-25-50",
-        dimension: "25×50 cm",
+        size: "25x50",
+        dimension: "25x50 cm",
         inches: "10×20 in",
         widthCm: 25,
         lengthCm: 50,
@@ -41,11 +52,13 @@ export const initialProducts = [
         stock: 500,
         moq: 40,
         weightKg: 0.063,
-        status: "Optimal Stock"
+        status: "Optimal Stock",
+        active: true
       },
       {
         id: "sz-30-60",
-        dimension: "30×60 cm",
+        size: "30x60",
+        dimension: "30x60 cm",
         inches: "12×24 in",
         widthCm: 30,
         lengthCm: 60,
@@ -56,11 +69,13 @@ export const initialProducts = [
         moq: 40,
         weightKg: 0.099,
         isPopular: true,
-        status: "Optimal Stock"
+        status: "Optimal Stock",
+        active: true
       },
       {
         id: "sz-35-70",
-        dimension: "35×70 cm",
+        size: "35x70",
+        dimension: "35x70 cm",
         inches: "14×28 in",
         widthCm: 35,
         lengthCm: 70,
@@ -70,11 +85,13 @@ export const initialProducts = [
         stock: 450,
         moq: 40,
         weightKg: 0.135,
-        status: "Optimal Stock"
+        status: "Optimal Stock",
+        active: true
       },
       {
         id: "sz-40-80",
-        dimension: "40×80 cm",
+        size: "40x80",
+        dimension: "40x80 cm",
         inches: "16×32 in",
         widthCm: 40,
         lengthCm: 80,
@@ -84,11 +101,13 @@ export const initialProducts = [
         stock: 400,
         moq: 40,
         weightKg: 0.192,
-        status: "In Demand"
+        status: "Optimal Stock",
+        active: true
       },
       {
         id: "sz-50-100",
-        dimension: "50×100 cm",
+        size: "50x100",
+        dimension: "50x100 cm",
         inches: "20×40 in",
         widthCm: 50,
         lengthCm: 100,
@@ -98,11 +117,13 @@ export const initialProducts = [
         stock: 350,
         moq: 40,
         weightKg: 0.300,
-        status: "Optimal Stock"
+        status: "Optimal Stock",
+        active: true
       },
       {
         id: "sz-70-140",
-        dimension: "70×140 cm",
+        size: "70x140",
+        dimension: "70x140 cm",
         inches: "27×54 in",
         widthCm: 70,
         lengthCm: 140,
@@ -112,11 +133,13 @@ export const initialProducts = [
         stock: 300,
         moq: 40,
         weightKg: 0.637,
-        status: "Optimal Stock"
+        status: "Optimal Stock",
+        active: true
       },
       {
         id: "sz-75-150",
-        dimension: "75×150 cm",
+        size: "75x150",
+        dimension: "75x150 cm",
         inches: "30×60 in",
         widthCm: 75,
         lengthCm: 150,
@@ -126,11 +149,13 @@ export const initialProducts = [
         stock: 250,
         moq: 40,
         weightKg: 0.731,
-        status: "Optimal Stock"
+        status: "Optimal Stock",
+        active: true
       },
       {
         id: "sz-80-160",
-        dimension: "80×160 cm",
+        size: "80x160",
+        dimension: "80x160 cm",
         inches: "32×64 in",
         widthCm: 80,
         lengthCm: 160,
@@ -140,25 +165,25 @@ export const initialProducts = [
         stock: 200,
         moq: 40,
         weightKg: 0.896,
-        status: "Optimal Stock"
+        status: "Optimal Stock",
+        active: true
       }
     ]
   }
 ];
 
 export const initialOrders = [];
-
 export const initialCustomers = [];
-
 
 export const millInfo = {
   name: "SSTextiles",
-  tagline: "Whole Sale Hand Looms Cloth Manufacturer",
-  subTagline: "Direct Mill White Towels",
-  address: "123, Weaver Street, Textile Nagar, Erode - 638 001, Tamil Nadu.",
-  phone: "9876543210, 9876543211",
+  tagline: "Direct-from-Mill Wholesale Terry Towel Consignments",
+  subTagline: "Direct Weaving Mill Cotton Plain White Terry Towels",
+  deityText: "SHIVAM",
+  address: "123 Textile Park, Perundurai Road, Erode - 638052, Tamil Nadu, India",
+  phone: "98765 43210, 98765 43211",
   whatsapp: "919876543210",
-  email: "contact@sstextiles.com",
+  email: "admin@sstextiles.com",
   gstin: "33AAAAA0000A1Z5",
   pan: "AAAAA0000A",
   stateCode: "33",
@@ -169,9 +194,9 @@ export const millInfo = {
   igstPercent: 5,
   bankDetails: {
     bankName: "State Bank of India",
-    branch: "Erode Main",
+    branch: "Erode Main Branch",
     accountName: "SSTextiles",
-    accountNumber: "000012345678901",
+    accountNumber: "30001234567",
     ifsc: "SBIN0001234",
     accountType: "Current Account"
   }

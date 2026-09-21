@@ -167,7 +167,7 @@ export const OrderProvider = ({ children }) => {
   }, [token, isAdmin, fetchCustomerOrders, fetchAdminOrders]);
 
   /**
-   * Create wholesale order
+   * Create wholesale order and decrement inventory stock
    */
   const createOrder = async (orderData) => {
     setLoading(true);
@@ -187,6 +187,15 @@ export const OrderProvider = ({ children }) => {
 
     // Optimistically add to state and localStorage
     updateOrdersState((prev) => [localOrder, ...prev]);
+
+    // Dispatch stock decrement event immediately
+    if (orderData?.items && typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('sst_order_stock_decrement', {
+          detail: { items: orderData.items },
+        })
+      );
+    }
 
     try {
       const response = await api.post('/orders', orderData);

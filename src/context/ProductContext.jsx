@@ -528,6 +528,77 @@ export const ProductProvider = ({ children }) => {
     return { success: true, settings: updated };
   };
 
+  /**
+   * Automatically decrement stock for purchased items
+   */
+  const decrementPurchasedStock = useCallback((purchasedItems) => {
+    if (!Array.isArray(purchasedItems) || purchasedItems.length === 0) return;
+
+    setProducts((prevProducts) => {
+      const updated = prevProducts.map((prod) => {
+        const prodSizes = prod.sizes || [];
+        const updatedSizes = prodSizes.map((sz) => {
+          const szKey = String(sz.size || sz.dimension || '')
+            .toLowerCase()
+            .replace(/cm|inch|in/gi, '')
+            .replace(/[×*X\-]/g, 'x')
+            .replace(/\s+/g, '')
+            .trim();
+
+          const matchingPurchase = purchasedItems.find((pItem) => {
+            const pKey = String(pItem.size || pItem.sizeId || '')
+              .toLowerCase()
+              .replace(/^sz-/, '')
+              .replace(/cm|inch|in/gi, '')
+              .replace(/[×*X\-]/g, 'x')
+              .replace(/\s+/g, '')
+              .trim();
+            const idMatches = String(sz._id || sz.id) === String(pItem.sizeId || pItem.sizeRef);
+            return idMatches || (pKey && pKey === szKey);
+          });
+
+          if (matchingPurchase) {
+            const purchasedQty = Number(matchingPurchase.quantity) || 0;
+            const remaining = Math.max(0, Number(sz.stock || 0) - purchasedQty);
+            return {
+              ...sz,
+              stock: remaining,
+              status: remaining > 0 ? (remaining >= 200 ? 'Optimal Stock' : 'In Stock') : 'Out of Stock',
+            };
+          }
+          return sz;
+        });
+
+        return {
+          ...prod,
+          sizes: updatedSizes,
+        };
+      });
+
+      saveProductsLocally(updated);
+      return updated;
+    });
+
+    // Refresh from backend to sync final MongoDB inventory
+    setTimeout(() => {
+      fetchProducts();
+      fetchInventorySummary();
+    }, 600);
+  }, [fetchProducts, fetchInventorySummary]);
+
+  // Listen for global order created stock decrement events
+  useEffect(() => {
+    const handleStockDecrementEvent = (e) => {
+      if (e.detail && Array.isArray(e.detail.items)) {
+        decrementPurchasedStock(e.detail.items);
+      }
+    };
+    window.addEventListener('sst_order_stock_decrement', handleStockDecrementEvent);
+    return () => {
+      window.removeEventListener('sst_order_stock_decrement', handleStockDecrementEvent);
+    };
+  }, [decrementPurchasedStock]);
+
   return (
     <ProductContext.Provider
       value={{
@@ -546,6 +617,7 @@ export const ProductProvider = ({ children }) => {
         updateSize,
         deleteSize,
         adjustSizeStock,
+        decrementPurchasedStock,
         millSettings,
         fetchMillSettings,
         updateMillSettings,

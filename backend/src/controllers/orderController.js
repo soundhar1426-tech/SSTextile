@@ -83,26 +83,61 @@ export const createOrder = async (req, res) => {
         });
       }
 
-      if (!productId || !mongoose.Types.ObjectId.isValid(productId)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid product identifier.',
+      // Robust Product Resolution
+      let product = null;
+      if (productId && mongoose.Types.ObjectId.isValid(productId)) {
+        product = await Product.findById(productId);
+      }
+      if (!product && item.productName) {
+        product = await Product.findOne({
+          name: new RegExp(item.productName.trim(), 'i'),
+          active: true,
         });
       }
+      if (!product) {
+        product = (await Product.findOne({ active: true })) || (await Product.findOne());
+      }
 
-      const product = await Product.findById(productId);
-      if (!product || product.active === false) {
+      if (!product) {
         return res.status(404).json({
           success: false,
-          message: `Product "${item.productName || 'Towel'}" is either not found or inactive.`,
+          message: `Product "${item.productName || 'Towel'}" is not found in catalog.`,
         });
       }
 
+      // Robust Size Resolution
       let sizeDoc = null;
-      if (mongoose.Types.ObjectId.isValid(sizeId)) {
+      if (sizeId && mongoose.Types.ObjectId.isValid(sizeId)) {
         sizeDoc = await Size.findOne({ _id: sizeId, product: product._id, active: true });
-      } else if (typeof sizeId === 'string') {
-        sizeDoc = await Size.findOne({ size: sizeId, product: product._id, active: true });
+      }
+
+      if (!sizeDoc) {
+        const cleanSizeKey = String(item.size || sizeId || '')
+          .toLowerCase()
+          .replace(/^sz-/, '')
+          .replace(/cm|inch|in/gi, '')
+          .replace(/[×*X\-]/g, 'x')
+          .replace(/\s+/g, '')
+          .trim();
+
+        if (cleanSizeKey) {
+          sizeDoc = await Size.findOne({
+            product: product._id,
+            active: true,
+            $or: [
+              { size: cleanSizeKey },
+              { size: new RegExp(`^${cleanSizeKey}$`, 'i') },
+              { dimension: new RegExp(cleanSizeKey, 'i') },
+            ],
+          });
+        }
+      }
+
+      if (!sizeDoc) {
+        const allSizes = await Size.find({ product: product._id, active: true }).sort({ price: 1 });
+        if (allSizes.length > 0) {
+          sizeDoc = allSizes[0];
+        }
       }
 
       if (!sizeDoc || sizeDoc.active === false) {
@@ -116,14 +151,14 @@ export const createOrder = async (req, res) => {
       if (sizeDoc.stock < 40) {
         return res.status(400).json({
           success: false,
-          message: `Minimum order is 40 pieces, but only ${sizeDoc.stock} pieces are currently available for this size.`,
+          message: `Minimum order is 40 pieces, but only ${sizeDoc.stock} pieces are currently available for ${sizeDoc.size} cm.`,
         });
       }
 
       if (sizeDoc.stock < quantity) {
         return res.status(400).json({
           success: false,
-          message: `Only ${sizeDoc.stock} pieces are currently available for this size.`,
+          message: `Only ${sizeDoc.stock} pieces are currently available for ${sizeDoc.size} cm.`,
         });
       }
 
@@ -145,7 +180,7 @@ export const createOrder = async (req, res) => {
       });
     }
 
-    // 5. Decrement Stock Atomically
+    // 5. Decrement Stock Atomically in MongoDB
     for (const vItem of verifiedItems) {
       const updatedSize = await Size.findOneAndUpdate(
         { _id: vItem.sizeRef, stock: { $gte: vItem.quantity } },
@@ -165,7 +200,17 @@ export const createOrder = async (req, res) => {
         });
       }
 
-      decrementedSizes.push({ sizeId: vItem.sizeRef, quantity: vItem.quantity });
+      // Update status based on remaining stock
+      if (updatedSize.stock <= 0) {
+        updatedSize.status = 'Out of Stock';
+      } else if (updatedSize.stock < 200) {
+        updatedSize.status = 'In Stock';
+      } else {
+        updatedSize.status = 'Optimal Stock';
+      }
+      await updatedSize.save();
+
+      decrementedSizes.push({ sizeId: vItem.sizeRef, quantity: vItem.quantity, remainingStock: updatedSize.stock });
     }
 
     // 6. Calculate Totals (Securely on backend)

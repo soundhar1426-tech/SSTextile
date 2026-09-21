@@ -468,7 +468,7 @@ export const getAllInvoices = async (req, res) => {
 };
 
 /**
- * @desc    Get all wholesale buyers with deduplication & trade volume metrics (Admin only)
+ * @desc    Get all wholesale buyers with strict deduplication & trade volume metrics (Admin only)
  * @route   GET /api/admin/customers
  * @access  Private (Admin)
  */
@@ -476,25 +476,39 @@ export const getAdminCustomers = async (req, res) => {
   try {
     const { search } = req.query;
 
+    const normalizePhoneDigits = (ph) => {
+      if (!ph) return '';
+      let digits = String(ph).replace(/\D/g, '');
+      if (digits.length === 12 && digits.startsWith('91')) {
+        digits = digits.slice(2);
+      } else if (digits.length === 11 && digits.startsWith('0')) {
+        digits = digits.slice(1);
+      }
+      return digits;
+    };
+
     // 1. Fetch registered customer users
-    const users = await User.find({ role: 'customer' }).sort({ createdAt: -1 }).lean();
+    const users = await User.find({ role: { $ne: 'admin' } }).sort({ createdAt: -1 }).lean();
 
     // 2. Fetch all orders with customer details
-    const orders = await Order.find().lean();
+    const orders = await Order.find().sort({ createdAt: -1 }).lean();
 
-    // 3. Compute statistics per customer by ID, email, and phone
+    // 3. Compute statistics per customer
     const statsByCustomer = new Map();
 
     for (const order of orders) {
       const custId = order.customer ? order.customer.toString() : null;
       const custEmail = (order.customerDetails?.email || '').toLowerCase().trim();
-      const custPhone = (order.customerDetails?.phone || '').replace(/[^0-9]/g, '');
+      const rawPhone = order.customerDetails?.phone || order.shippingAddress?.phone || '';
+      const custPhone = normalizePhoneDigits(rawPhone);
+      const custGstin = (order.customerDetails?.gstin || order.shippingAddress?.gstin || '').toUpperCase().trim();
       const orderAmount = Number(order.totalAmount || order.total || 0);
 
       const keys = [];
       if (custId) keys.push(`id:${custId}`);
       if (custEmail) keys.push(`email:${custEmail}`);
       if (custPhone) keys.push(`phone:${custPhone}`);
+      if (custGstin && custGstin.length >= 10) keys.push(`gstin:${custGstin}`);
 
       for (const key of keys) {
         if (!statsByCustomer.has(key)) {
@@ -514,42 +528,83 @@ export const getAdminCustomers = async (req, res) => {
     }
 
     // 4. Merge and deduplicate customer profiles
-    const customerMap = new Map(); // Key: normalized email or phone
+    const deduplicatedBuyers = [];
+    const seenEmails = new Set();
+    const seenPhones = new Set();
+    const seenGstins = new Set();
+    const seenNames = new Set();
+    const seenIds = new Set();
 
-    for (const user of users) {
-      const emailKey = (user.email || '').toLowerCase().trim();
-      const phoneKey = (user.phone || '').replace(/[^0-9]/g, '');
-      const dedupeKey = emailKey || phoneKey || user._id.toString();
+    const addOrMergeBuyer = (candidate) => {
+      const normEmail = (candidate.email || '').toLowerCase().trim();
+      const normPhone = normalizePhoneDigits(candidate.phone);
+      const normGstin = (candidate.gstin || '').toUpperCase().trim();
+      const normName = (candidate.name || candidate.businessName || '').toLowerCase().trim();
+      const candId = candidate.id || candidate._id ? String(candidate.id || candidate._id) : '';
 
-      if (customerMap.has(dedupeKey)) {
-        // If already seen, merge details if needed and skip duplicate
-        continue;
+      // Check if candidate matches any previously seen buyer
+      let existingIndex = -1;
+      if (candId && seenIds.has(candId)) {
+        existingIndex = deduplicatedBuyers.findIndex((b) => b.id === candId || b._id === candId);
+      }
+      if (existingIndex === -1 && normEmail && normEmail !== 'n/a' && seenEmails.has(normEmail)) {
+        existingIndex = deduplicatedBuyers.findIndex((b) => (b.email || '').toLowerCase().trim() === normEmail);
+      }
+      if (existingIndex === -1 && normPhone && normPhone.length >= 10 && seenPhones.has(normPhone)) {
+        existingIndex = deduplicatedBuyers.findIndex((b) => normalizePhoneDigits(b.phone) === normPhone);
+      }
+      if (existingIndex === -1 && normGstin && normGstin !== 'UNREGISTERED' && normGstin.length >= 15 && seenGstins.has(normGstin)) {
+        existingIndex = deduplicatedBuyers.findIndex((b) => (b.gstin || '').toUpperCase().trim() === normGstin);
+      }
+      if (existingIndex === -1 && normName && normName.length > 3 && seenNames.has(normName)) {
+        existingIndex = deduplicatedBuyers.findIndex((b) => (b.name || '').toLowerCase().trim() === normName);
       }
 
-      const idKey = `id:${user._id.toString()}`;
-      const emailStatKey = `email:${emailKey}`;
-      const phoneStatKey = `phone:${phoneKey}`;
+      const idKey = candId ? `id:${candId}` : '';
+      const emailKey = normEmail ? `email:${normEmail}` : '';
+      const phoneKey = normPhone ? `phone:${normPhone}` : '';
+      const gstinKey = normGstin ? `gstin:${normGstin}` : '';
 
       const stat =
-        statsByCustomer.get(idKey) ||
-        statsByCustomer.get(emailStatKey) ||
-        statsByCustomer.get(phoneStatKey) || {
-          totalOrdersCount: 0,
-          lifetimeVolumeNum: 0,
-          lastOrderDate: null,
+        (idKey && statsByCustomer.get(idKey)) ||
+        (emailKey && statsByCustomer.get(emailKey)) ||
+        (phoneKey && statsByCustomer.get(phoneKey)) ||
+        (gstinKey && statsByCustomer.get(gstinKey)) || {
+          totalOrdersCount: candidate.totalOrdersCount || 0,
+          lifetimeVolumeNum: candidate.lifetimeVolumeNum || 0,
+          lastOrderDate: candidate.lastOrderDate || null,
         };
 
+      if (existingIndex > -1) {
+        // Merge with existing record
+        const existing = deduplicatedBuyers[existingIndex];
+        existing.totalOrdersCount = Math.max(existing.totalOrdersCount, stat.totalOrdersCount);
+        existing.lifetimeVolumeNum = Math.max(existing.lifetimeVolumeNum, stat.lifetimeVolumeNum);
+        existing.lifetimeVolume = `₹${existing.lifetimeVolumeNum.toLocaleString('en-IN')}`;
+        if (!existing.phone || existing.phone === 'N/A') existing.phone = candidate.phone;
+        if (!existing.email || existing.email === 'N/A') existing.email = candidate.email;
+        if (!existing.gstin || existing.gstin === 'Unregistered') existing.gstin = candidate.gstin;
+        if (!existing.address) existing.address = candidate.address;
+        if (!existing.city) existing.city = candidate.city;
+        if (!existing.state) existing.state = candidate.state;
+        if (!existing.pincode) existing.pincode = candidate.pincode;
+        return;
+      }
+
+      // Create new unique buyer record
       const buyer = {
-        id: user._id.toString(),
-        _id: user._id.toString(),
-        name: user.companyName || user.name || 'Wholesale Buyer',
-        contactPerson: user.name || 'Primary Contact',
-        phone: user.phone || 'N/A',
-        email: user.email || 'N/A',
-        gstin: user.gstin || 'Unregistered',
-        pan: user.gstin && user.gstin.length >= 12 ? user.gstin.substring(2, 12) : (user.pan || 'N/A'),
-        city: user.city || 'Erode',
-        state: user.state || 'Tamil Nadu',
+        id: candId || `cust-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        _id: candId || `cust-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        name: candidate.businessName || candidate.companyName || candidate.name || 'Wholesale Buyer',
+        contactPerson: candidate.name || candidate.contactPerson || 'Primary Contact',
+        phone: candidate.phone || 'N/A',
+        email: candidate.email || 'N/A',
+        gstin: candidate.gstin || 'Unregistered',
+        pan: candidate.gstin && candidate.gstin.length >= 12 ? candidate.gstin.substring(2, 12) : (candidate.pan || 'N/A'),
+        address: candidate.address || '',
+        city: candidate.city || 'Erode',
+        state: candidate.state || 'Tamil Nadu',
+        pincode: candidate.pincode || '638001',
         creditStatus:
           stat.totalOrdersCount >= 5
             ? 'Tier 1 Active'
@@ -560,13 +615,49 @@ export const getAdminCustomers = async (req, res) => {
         lifetimeVolume: `₹${stat.lifetimeVolumeNum.toLocaleString('en-IN')}`,
         lifetimeVolumeNum: stat.lifetimeVolumeNum,
         lastOrderDate: stat.lastOrderDate,
-        createdAt: user.createdAt,
+        createdAt: candidate.createdAt || new Date(),
       };
 
-      customerMap.set(dedupeKey, buyer);
+      deduplicatedBuyers.push(buyer);
+      if (candId) seenIds.add(candId);
+      if (normEmail && normEmail !== 'n/a') seenEmails.add(normEmail);
+      if (normPhone && normPhone.length >= 10) seenPhones.add(normPhone);
+      if (normGstin && normGstin !== 'UNREGISTERED' && normGstin.length >= 15) seenGstins.add(normGstin);
+      if (normName && normName.length > 3) seenNames.add(normName);
+    };
+
+    // Process all users
+    for (const user of users) {
+      addOrMergeBuyer({
+        ...user,
+        id: user._id.toString(),
+        _id: user._id.toString(),
+        businessName: user.businessName || user.companyName,
+      });
     }
 
-    let customerList = Array.from(customerMap.values());
+    // Process all orders for any guest or unlinked buyers
+    for (const order of orders) {
+      if (order.customerDetails) {
+        addOrMergeBuyer({
+          id: order.customer ? order.customer.toString() : '',
+          _id: order.customer ? order.customer.toString() : '',
+          name: order.customerDetails.name,
+          businessName: order.customerDetails.businessName || order.customerDetails.name,
+          contactPerson: order.customerDetails.name,
+          phone: order.customerDetails.phone,
+          email: order.customerDetails.email,
+          gstin: order.customerDetails.gstin,
+          address: order.deliveryDetails?.addressLine1 || order.shippingAddress?.address,
+          city: order.deliveryDetails?.city || order.shippingAddress?.city,
+          state: order.deliveryDetails?.state || order.shippingAddress?.state,
+          pincode: order.deliveryDetails?.pincode || order.shippingAddress?.pincode,
+          createdAt: order.createdAt,
+        });
+      }
+    }
+
+    let customerList = [...deduplicatedBuyers];
 
     // 5. Apply search filter if query provided
     if (search && search.trim()) {

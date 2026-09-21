@@ -34,20 +34,50 @@ export const AdminCustomers = () => {
     fetchBuyers();
   }, []);
 
-  // Strict deduplication filter across all sources (by email, phone, or id)
+  // Strict multi-key deduplication filter across all sources (by email, normalized phone, GSTIN, company name, or id)
   const deduplicatedBuyers = useMemo(() => {
-    const seen = new Set();
+    const normalizePhoneDigits = (ph) => {
+      if (!ph) return '';
+      let digits = String(ph).replace(/\D/g, '');
+      if (digits.length === 12 && digits.startsWith('91')) {
+        digits = digits.slice(2);
+      } else if (digits.length === 11 && digits.startsWith('0')) {
+        digits = digits.slice(1);
+      }
+      return digits;
+    };
+
+    const seenIds = new Set();
+    const seenEmails = new Set();
+    const seenPhones = new Set();
+    const seenGstins = new Set();
+    const seenNames = new Set();
     const result = [];
 
     for (const b of buyers) {
       const email = (b.email || '').toLowerCase().trim();
-      const phone = (b.phone || '').replace(/[^0-9]/g, '');
-      const key = email || phone || b.id || b._id;
+      const phone = normalizePhoneDigits(b.phone);
+      const gstin = (b.gstin || '').toUpperCase().trim();
+      const name = (b.name || b.companyName || b.businessName || '').toLowerCase().trim();
+      const bId = b.id || b._id ? String(b.id || b._id) : '';
 
-      if (!key || seen.has(key)) {
+      let isDuplicate = false;
+      if (bId && seenIds.has(bId)) isDuplicate = true;
+      if (!isDuplicate && email && email !== 'n/a' && seenEmails.has(email)) isDuplicate = true;
+      if (!isDuplicate && phone && phone.length >= 10 && seenPhones.has(phone)) isDuplicate = true;
+      if (!isDuplicate && gstin && gstin !== 'UNREGISTERED' && gstin.length >= 15 && seenGstins.has(gstin)) isDuplicate = true;
+      if (!isDuplicate && name && name.length > 3 && seenNames.has(name)) isDuplicate = true;
+
+      if (isDuplicate) {
         continue;
       }
-      seen.add(key);
+
+      if (bId) seenIds.add(bId);
+      if (email && email !== 'n/a') seenEmails.add(email);
+      if (phone && phone.length >= 10) seenPhones.add(phone);
+      if (gstin && gstin !== 'UNREGISTERED' && gstin.length >= 15) seenGstins.add(gstin);
+      if (name && name.length > 3) seenNames.add(name);
+
       result.push(b);
     }
     return result;

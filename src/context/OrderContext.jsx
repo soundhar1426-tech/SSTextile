@@ -315,7 +315,7 @@ export const OrderProvider = ({ children }) => {
   /**
    * Create wholesale order and decrement inventory stock
    */
-  const createOrder = async (orderData) => {
+  const createOrder = useCallback(async (orderData) => {
     setLoading(true);
     setError(null);
 
@@ -393,34 +393,24 @@ export const OrderProvider = ({ children }) => {
     }
 
     return { success: true, order: localOrder };
-  };
+  }, [updateOrdersState]);
 
   /**
    * Get single order by ID or orderNumber
    */
-  const getOrderById = async (id) => {
+  const getOrderById = useCallback(async (id) => {
     if (!id) return null;
     const cleanId = String(id).trim();
 
-    // Check cached state or local storage first
-    let found = orders.find(
+    // Check local storage first
+    const stored = getStoredOrders();
+    let found = stored.find(
       (o) =>
         o._id === cleanId ||
         o.id === cleanId ||
         o.orderNumber === cleanId ||
         o.orderNumber?.toUpperCase() === cleanId.toUpperCase()
     );
-
-    if (!found) {
-      const stored = getStoredOrders();
-      found = stored.find(
-        (o) =>
-          o._id === cleanId ||
-          o.id === cleanId ||
-          o.orderNumber === cleanId ||
-          o.orderNumber?.toUpperCase() === cleanId.toUpperCase()
-      );
-    }
 
     try {
       const response = await api.get(`/orders/${cleanId}`);
@@ -444,12 +434,12 @@ export const OrderProvider = ({ children }) => {
     }
 
     return found || null;
-  };
+  }, [updateOrdersState]);
 
   /**
    * Fetch invoice for an order
    */
-  const getOrderInvoice = async (orderId) => {
+  const getOrderInvoice = useCallback(async (orderId) => {
     if (!orderId) return { success: false, error: 'No order ID provided' };
     const cleanId = String(orderId).trim();
 
@@ -532,12 +522,12 @@ export const OrderProvider = ({ children }) => {
     }
 
     return { success: false, error: 'Invoice is generated after payment confirmation.' };
-  };
+  }, [getOrderById]);
 
   /**
    * Update order status (Admin)
    */
-  const updateOrderStatus = async (orderId, newStatus, extraData = {}) => {
+  const updateOrderStatus = useCallback(async (orderId, newStatus, extraData = {}) => {
     const cleanId = String(orderId).trim();
 
     // Optimistically update locally
@@ -586,22 +576,20 @@ export const OrderProvider = ({ children }) => {
       console.warn('[OrderContext] Status updated locally:', err.message);
     }
 
-    const currentOrd = orders.find((o) => o._id === cleanId || o.orderNumber === cleanId);
+    const stored = getStoredOrders();
+    const currentOrd = stored.find((o) => o._id === cleanId || o.orderNumber === cleanId);
     return { success: true, order: currentOrd || { _id: cleanId, orderStatus: newStatus } };
-  };
+  }, [updateOrdersState]);
 
   /**
    * Confirm manual payment received, change status to confirmed/paid, and issue final GST invoice
    */
-  const confirmPayment = async (orderId, paymentData = {}) => {
+  const confirmPayment = useCallback(async (orderId, paymentData = {}) => {
     const cleanId = String(orderId).trim();
     const paidAt = new Date().toISOString();
 
-    let targetOrder = orders.find((o) => o._id === cleanId || o.orderNumber === cleanId || o.id === cleanId);
-    if (!targetOrder) {
-      const stored = getStoredOrders();
-      targetOrder = stored.find((o) => o._id === cleanId || o.orderNumber === cleanId || o.id === cleanId);
-    }
+    const stored = getStoredOrders();
+    const targetOrder = stored.find((o) => o._id === cleanId || o.orderNumber === cleanId || o.id === cleanId);
 
     const orderNum = targetOrder?.orderNumber || cleanId;
     const invNum = `GTX-INV-${orderNum.replace(/^SST-|^GTX-/, '')}`;
@@ -715,14 +703,13 @@ export const OrderProvider = ({ children }) => {
       console.warn('[OrderContext] Payment confirmed locally with generated invoice:', err.message);
     }
 
-    const updatedOrder = orders.find((o) => o._id === cleanId || o.orderNumber === cleanId) || targetOrder;
-    return { success: true, order: updatedOrder, invoice: localInvoice };
-  };
+    return { success: true, order: targetOrder, invoice: localInvoice };
+  }, [updateOrdersState]);
 
   /**
    * Verify, check and confirm bill & generate GST Tax Invoice in one seamless step
    */
-  const verifyAndConfirmBill = async (orderId, billData = {}) => {
+  const verifyAndConfirmBill = useCallback(async (orderId, billData = {}) => {
     const cleanId = String(orderId).trim();
     
     // 1. Update bill details on server
@@ -740,12 +727,12 @@ export const OrderProvider = ({ children }) => {
       paymentReference: billData.paymentReference || `VERIFIED-${Date.now().toString().slice(-6)}`,
       amount: billData.totalAmount || billData.total,
     });
-  };
+  }, [confirmPayment]);
 
   /**
    * Update invoice / bill details (Admin)
    */
-  const updateInvoice = async (invoiceOrOrderId, updatedData = {}) => {
+  const updateInvoice = useCallback(async (invoiceOrOrderId, updatedData = {}) => {
     const cleanId = String(invoiceOrOrderId).trim();
     try {
       const response = await api.put(`/admin/invoices/${cleanId}`, updatedData);
@@ -794,12 +781,12 @@ export const OrderProvider = ({ children }) => {
     saveStoredInvoice(cleanId, mergedInvoice);
 
     return { success: true, invoice: mergedInvoice };
-  };
+  }, [updateOrdersState]);
 
   /**
    * Fetch all invoices (Admin)
    */
-  const fetchAdminInvoices = async () => {
+  const fetchAdminInvoices = useCallback(async () => {
     try {
       const response = await api.get('/admin/invoices');
       if (response.data?.success && Array.isArray(response.data.invoices)) {
@@ -812,7 +799,7 @@ export const OrderProvider = ({ children }) => {
     const storedInvoices = getStoredInvoices();
     const invoiceList = Object.values(storedInvoices);
     return { success: true, invoices: invoiceList };
-  };
+  }, []);
 
   return (
     <OrderContext.Provider

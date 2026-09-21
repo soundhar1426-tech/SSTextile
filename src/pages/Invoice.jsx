@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useOrders } from '../context/OrderContext';
 import { useProducts } from '../context/ProductContext';
@@ -229,27 +229,49 @@ export const Invoice = () => {
   const [paymentRef, setPaymentRef] = useState('');
   const [confirmPaymentOnSave, setConfirmPaymentOnSave] = useState(false);
 
+  // Ref to track if bill is actively being edited to prevent background state overwrite
+  const isEditingRef = useRef(false);
   useEffect(() => {
+    isEditingRef.current = isEditingBill;
+  }, [isEditingBill]);
+
+  useEffect(() => {
+    let isMounted = true;
     const fetchInvoiceData = async () => {
       if (!id) return;
-      setLoading(true);
+      
+      // ONLY show initial loading spinner if neither invoice nor order is loaded yet
+      if (!invoice && !order) {
+        setLoading(true);
+      }
 
       const invRes = await getOrderInvoice(id);
+      if (!isMounted) return;
+
       if (invRes.success && invRes.invoice) {
-        setInvoice(invRes.invoice);
+        setInvoice((prev) => {
+          // If admin is actively editing bill details, do not overwrite in-progress edits
+          if (isEditingRef.current && prev) return prev;
+          return invRes.invoice;
+        });
       } else {
-        setErrorMessage(invRes.error || 'Invoice is not available for this order.');
         const ordData = await getOrderById(id);
-        if (ordData) {
+        if (isMounted && ordData) {
           setOrder(ordData);
         }
       }
 
-      setLoading(false);
+      if (isMounted) {
+        setLoading(false);
+      }
     };
 
     fetchInvoiceData();
-  }, [id, getOrderInvoice, getOrderById]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [id]);
 
   // Invoice Number & Active Mill Snapshot (Prioritizes live millSettings for non-customized bills)
   const isInvoiceCustomized = invoice?.isCustomized === true;

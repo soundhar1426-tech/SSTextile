@@ -77,7 +77,7 @@ export const AdminLayout = () => {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Audio Chime Notification Toggle & Test */}
+          {/* Audio Pop Notification Toggle & Test */}
           <div className="flex items-center gap-1 bg-surface-container-low px-2 py-1 rounded-lg border border-outline-variant">
             <button
               type="button"
@@ -85,21 +85,21 @@ export const AdminLayout = () => {
               className={`p-1 rounded flex items-center gap-1 text-xs font-bold transition-all cursor-pointer ${
                 soundEnabled ? 'text-secondary' : 'text-on-surface-variant'
               }`}
-              title={soundEnabled ? 'Order sound alert is ON. Click to mute.' : 'Order sound alert is muted. Click to turn ON.'}
+              title={soundEnabled ? 'Order pop sound alert is ON. Click to mute.' : 'Order sound alert is muted. Click to turn ON.'}
             >
               <span className="material-symbols-outlined text-base">
                 {soundEnabled ? 'volume_up' : 'volume_off'}
               </span>
-              <span className="hidden lg:inline">{soundEnabled ? 'Sound: ON' : 'Muted'}</span>
+              <span className="hidden lg:inline">{soundEnabled ? 'Pop Alert: ON' : 'Muted'}</span>
             </button>
 
             <button
               type="button"
               onClick={handleTestSound}
               className="text-[10px] px-1.5 py-0.5 rounded bg-primary text-white font-bold hover:bg-primary/90 transition-all cursor-pointer hidden sm:inline-block"
-              title="Test the 3-tone incoming order sound chime"
+              title="Test the crisp bubble pop sound effect"
             >
-              Test Sound
+              Test Pop Sound
             </button>
           </div>
 

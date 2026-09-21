@@ -4,7 +4,6 @@ import { useAuth } from './AuthContext';
 import { millInfo } from '../data/mockData';
 import {
   playNewOrderSound,
-  announceNewOrder,
   unlockAudio,
   requestNotificationPermission,
   showDesktopNotification,
@@ -166,7 +165,6 @@ export const OrderProvider = ({ children }) => {
               const latest = newlyArrived[0];
               if (soundEnabled) {
                 playNewOrderSound();
-                announceNewOrder(latest.orderNumber, latest.customerDetails?.businessName || latest.customerDetails?.name);
               }
               showDesktopNotification(
                 '🚨 New Wholesale Order Received!',
@@ -241,7 +239,6 @@ export const OrderProvider = ({ children }) => {
         if (isAdmin) {
           if (soundEnabled) {
             playNewOrderSound();
-            announceNewOrder(order.orderNumber, order.customerDetails?.businessName || order.customerDetails?.name);
           }
           setNewOrderAlert(order);
           showDesktopNotification(
@@ -279,7 +276,6 @@ export const OrderProvider = ({ children }) => {
             if (isAdmin) {
               if (soundEnabled) {
                 playNewOrderSound();
-                announceNewOrder(data.order.orderNumber, data.order.customerDetails?.businessName || data.order.customerDetails?.name);
               }
               setNewOrderAlert(data.order);
               showDesktopNotification(

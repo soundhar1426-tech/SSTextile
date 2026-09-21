@@ -265,12 +265,12 @@ export const AdminOrders = () => {
                 ? 'bg-[#E6F5F0] border-secondary-fixed text-secondary'
                 : 'bg-surface-container border-outline-variant text-on-surface-variant'
             }`}
-            title="Toggle audible chime when new orders are placed"
+            title="Toggle pop sound effect when new orders are placed"
           >
             <span className="material-symbols-outlined text-base">
               {soundEnabled ? 'volume_up' : 'volume_off'}
             </span>
-            <span>{soundEnabled ? 'Sound: ON' : 'Sound: Muted'}</span>
+            <span>{soundEnabled ? 'Pop Alert: ON' : 'Pop Alert: Muted'}</span>
           </button>
         </div>
       </div>

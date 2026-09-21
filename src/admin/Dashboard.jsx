@@ -92,12 +92,12 @@ export const Dashboard = () => {
                   ? 'bg-[#E6F5F0] border-secondary-fixed text-secondary'
                   : 'bg-surface-container border-outline-variant text-on-surface-variant'
               }`}
-              title="Toggle audible chime for new orders"
+              title="Toggle pop sound effect for new orders"
             >
               <span className="material-symbols-outlined text-base">
                 {soundEnabled ? 'volume_up' : 'volume_off'}
               </span>
-              <span>{soundEnabled ? 'Sound Alert: ON' : 'Sound Alert: Muted'}</span>
+              <span>{soundEnabled ? 'Pop Alert: ON' : 'Pop Alert: Muted'}</span>
             </button>
             <span className="text-label-sm font-label-sm text-on-surface-variant flex items-center">
               <span className="material-symbols-outlined text-[14px] mr-1">verified_user</span>

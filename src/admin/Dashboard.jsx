@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { useOrders } from '../context/OrderContext';
+import { useOrders, deduplicateOrders } from '../context/OrderContext';
 import { useProducts } from '../context/ProductContext';
 import { millInfo } from '../data/mockData';
 import { playNewOrderSound, requestNotificationPermission, showDesktopNotification } from '../utils/soundAlert';
@@ -26,11 +26,16 @@ export const Dashboard = () => {
     return () => clearInterval(interval);
   }, [fetchAdminOrders]);
 
+  // Strictly deduplicated list of orders
+  const uniqueOrders = useMemo(() => {
+    return deduplicateOrders(orders || []);
+  }, [orders]);
+
   // Detect new incoming orders and ring chime
   useEffect(() => {
-    if (orders && orders.length > 0) {
-      if (prevOrdersCountRef.current !== null && orders.length > prevOrdersCountRef.current) {
-        const latestOrder = orders[0];
+    if (uniqueOrders && uniqueOrders.length > 0) {
+      if (prevOrdersCountRef.current !== null && uniqueOrders.length > prevOrdersCountRef.current) {
+        const latestOrder = uniqueOrders[0];
         if (soundEnabled) {
           playNewOrderSound();
         }
@@ -40,24 +45,31 @@ export const Dashboard = () => {
         );
         setNewOrderAlert(latestOrder);
       }
-      prevOrdersCountRef.current = orders.length;
-    } else if (orders) {
-      prevOrdersCountRef.current = orders.length;
+      prevOrdersCountRef.current = uniqueOrders.length;
+    } else if (uniqueOrders) {
+      prevOrdersCountRef.current = uniqueOrders.length;
     }
-  }, [orders, soundEnabled]);
+  }, [uniqueOrders, soundEnabled]);
 
-  const filteredOrders = orders.filter(order => {
-    const st = (order.orderStatus || order.status || '').toLowerCase();
-    const pm = (order.paymentStatus || '').toLowerCase();
-    if (filterTab === 'ALL') return true;
-    if (filterTab === 'PENDING') return st.includes('loading') || st.includes('verified') || st.includes('new') || pm === 'pending';
-    if (filterTab === 'TRANSIT') return st.includes('transit') || st.includes('dispatched') || st.includes('ready_for_dispatch') || st.includes('processing');
-    if (filterTab === 'DELIVERED') return st.includes('delivered');
-    return true;
-  });
+  const filteredOrders = useMemo(() => {
+    return uniqueOrders.filter(order => {
+      const st = (order.orderStatus || order.status || '').toLowerCase();
+      const pm = (order.paymentStatus || '').toLowerCase();
+      if (filterTab === 'ALL') return true;
+      if (filterTab === 'PENDING') return st.includes('loading') || st.includes('verified') || st.includes('new') || pm === 'pending';
+      if (filterTab === 'TRANSIT') return st.includes('transit') || st.includes('dispatched') || st.includes('ready_for_dispatch') || st.includes('processing');
+      if (filterTab === 'DELIVERED') return st.includes('delivered');
+      return true;
+    });
+  }, [uniqueOrders, filterTab]);
 
-  const totalRevenue = orders.reduce((sum, o) => sum + (o.totalAmount || o.total || o.totalPayable || o.subtotal || 0), 0);
-  const totalPieces = orders.reduce((sum, o) => sum + (o.totalPieces || o.items?.reduce((s, i) => s + (i.quantity || 0), 0) || 0), 0);
+  const totalRevenue = useMemo(() => {
+    return uniqueOrders.reduce((sum, o) => sum + (o.totalAmount || o.total || o.totalPayable || o.subtotal || 0), 0);
+  }, [uniqueOrders]);
+
+  const totalPieces = useMemo(() => {
+    return uniqueOrders.reduce((sum, o) => sum + (o.totalPieces || o.items?.reduce((s, i) => s + (i.quantity || 0), 0) || 0), 0);
+  }, [uniqueOrders]);
 
   return (
     <div className="space-y-4">
@@ -140,7 +152,7 @@ export const Dashboard = () => {
           >
             <span>All</span>
             <span className="px-1.5 py-0.2 rounded-full bg-surface-container-lowest text-primary text-[10px] font-bold">
-              {orders.length}
+              {uniqueOrders.length}
             </span>
           </button>
 
@@ -154,7 +166,7 @@ export const Dashboard = () => {
           >
             <span>Pending Dispatch</span>
             <span className="px-1.5 py-0.2 rounded-full bg-surface-dim text-on-surface-variant text-[10px] font-bold">
-              {orders.filter(o => {
+              {uniqueOrders.filter(o => {
                 const st = (o.orderStatus || o.status || '').toLowerCase();
                 const pm = (o.paymentStatus || '').toLowerCase();
                 return st.includes('loading') || st.includes('verified') || st.includes('new') || pm === 'pending';
@@ -172,7 +184,7 @@ export const Dashboard = () => {
           >
             <span>In Transit</span>
             <span className="px-1.5 py-0.2 rounded-full bg-surface-dim text-on-surface-variant text-[10px] font-bold">
-              {orders.filter(o => {
+              {uniqueOrders.filter(o => {
                 const st = (o.orderStatus || o.status || '').toLowerCase();
                 return st.includes('transit') || st.includes('dispatched') || st.includes('ready_for_dispatch') || st.includes('processing');
               }).length}
@@ -189,7 +201,7 @@ export const Dashboard = () => {
           >
             <span>Delivered</span>
             <span className="px-1.5 py-0.2 rounded-full bg-surface-dim text-on-surface-variant text-[10px] font-bold">
-              {orders.filter(o => (o.orderStatus || o.status || '').toLowerCase().includes('delivered')).length}
+              {uniqueOrders.filter(o => (o.orderStatus || o.status || '').toLowerCase().includes('delivered')).length}
             </span>
           </button>
         </div>
@@ -254,108 +266,120 @@ export const Dashboard = () => {
 
       {/* Orders List */}
       <div className="space-y-4">
-        {filteredOrders.map((order) => {
-          let badgeStyle = "bg-[#FFF4E5] text-[#B76E00] border-[#FFE2B3]";
-          let dotColor = "bg-[#B76E00]";
-          const isPaid = (order.paymentStatus || '').toLowerCase() === 'paid';
-          const orderNum = order.orderNumber || order.id || `GTX-${order._id?.slice(-5)}`;
-          const orderTotal = order.totalAmount || order.total || order.totalPayable || order.subtotal || 0;
-          const buyer = order.customerDetails?.businessName || order.customerDetails?.name || order.customer?.name || order.buyerName || 'Customer';
-          const orderStatus = order.orderStatus || order.status || 'new';
+        {filteredOrders.length === 0 ? (
+          <div className="bg-surface-container-lowest rounded-xl border border-outline-variant p-8 text-center shadow-sm">
+            <div className="w-12 h-12 rounded-full bg-surface-container mx-auto flex items-center justify-center text-on-surface-variant mb-3">
+              <span className="material-symbols-outlined text-2xl">inbox</span>
+            </div>
+            <h3 className="text-body-lg font-bold text-primary">No Purchase Orders Found</h3>
+            <p className="text-body-sm text-on-surface-variant mt-1 max-w-md mx-auto">
+              There are no orders matching the selected filter ({filterTab}). When wholesale buyers place new purchase orders, they will appear here in real-time.
+            </p>
+          </div>
+        ) : (
+          filteredOrders.map((order) => {
+            let badgeStyle = "bg-[#FFF4E5] text-[#B76E00] border-[#FFE2B3]";
+            let dotColor = "bg-[#B76E00]";
+            const isPaid = (order.paymentStatus || '').toLowerCase() === 'paid';
+            const orderNum = order.orderNumber || order.id || `GTX-${order._id?.slice(-5)}`;
+            const orderTotal = order.totalAmount || order.total || order.totalPayable || order.subtotal || 0;
+            const buyer = order.customerDetails?.businessName || order.customerDetails?.name || order.customer?.name || order.buyerName || 'Customer';
+            const orderStatus = order.orderStatus || order.status || 'new';
 
-          if (orderStatus.toLowerCase().includes('transit') || orderStatus.toLowerCase().includes('dispatched')) {
-            badgeStyle = "bg-[#E6F5F0] text-secondary border-secondary-container";
-            dotColor = "bg-secondary";
-          } else if (isPaid || orderStatus.toLowerCase().includes('verified')) {
-            badgeStyle = "bg-secondary-container text-on-secondary-container border-secondary-fixed-dim";
-            dotColor = "bg-secondary";
-          }
+            if (orderStatus.toLowerCase().includes('transit') || orderStatus.toLowerCase().includes('dispatched')) {
+              badgeStyle = "bg-[#E6F5F0] text-secondary border-secondary-container";
+              dotColor = "bg-secondary";
+            } else if (isPaid || orderStatus.toLowerCase().includes('verified')) {
+              badgeStyle = "bg-secondary-container text-on-secondary-container border-secondary-fixed-dim";
+              dotColor = "bg-secondary";
+            }
 
-          return (
-            <article
-              key={order._id || order.id}
-              className="bg-surface-container-lowest rounded-xl border border-outline-variant p-4 transition-all shadow-sm space-y-3"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-label-lg font-label-lg font-bold text-primary font-mono">
-                      #{orderNum}
-                    </span>
-                    <span className="text-label-sm font-label-sm text-on-surface-variant px-1.5 py-0.5 rounded bg-surface-container font-mono">
-                      {order.poNumber || (isPaid ? 'PAID' : 'PENDING')}
+            return (
+              <article
+                key={order._id || order.id}
+                className="bg-surface-container-lowest rounded-xl border border-outline-variant p-4 transition-all shadow-sm space-y-3"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-label-lg font-label-lg font-bold text-primary font-mono">
+                        #{orderNum}
+                      </span>
+                      <span className="text-label-sm font-label-sm text-on-surface-variant px-1.5 py-0.5 rounded bg-surface-container font-mono">
+                        {order.poNumber || (isPaid ? 'PAID' : 'PENDING')}
+                      </span>
+                    </div>
+                    <h3 className="text-body-md font-body-md font-semibold text-primary mt-0.5">
+                      {buyer}
+                    </h3>
+                  </div>
+
+                  <span className={`inline-flex items-center px-2.5 py-1 rounded text-label-sm font-label-sm font-bold border ${badgeStyle} capitalize`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${dotColor} mr-1.5 pulse-live`}></span>
+                    {orderStatus}
+                  </span>
+                </div>
+
+                {/* Spec Breakdown Box */}
+                <div className="p-3 bg-surface rounded-lg border border-surface-container-high space-y-1.5">
+                  <div className="flex justify-between items-center text-body-sm">
+                    <span className="text-on-surface-variant font-medium">Volume Breakdown:</span>
+                    <span className="font-bold text-primary font-mono">
+                      {order.totalPieces || order.items?.reduce((s, i) => s + (i.quantity || 0), 0) || 0} pcs total
                     </span>
                   </div>
-                  <h3 className="text-body-md font-body-md font-semibold text-primary mt-0.5">
-                    {buyer}
-                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-surface-container-high text-label-sm text-on-surface-variant">
+                    {order.items?.map((item, idx) => (
+                      <span key={idx} className="flex items-center">
+                        <span className="material-symbols-outlined text-[14px] mr-1 text-on-surface-variant">straighten</span>
+                        {item.quantity} pcs • {item.size || item.dimension} ({item.productName || item.productTitle || 'Towel'})
+                      </span>
+                    ))}
+                  </div>
                 </div>
 
-                <span className={`inline-flex items-center px-2.5 py-1 rounded text-label-sm font-label-sm font-bold border ${badgeStyle} capitalize`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${dotColor} mr-1.5 pulse-live`}></span>
-                  {orderStatus}
-                </span>
-              </div>
-
-              {/* Spec Breakdown Box */}
-              <div className="p-3 bg-surface rounded-lg border border-surface-container-high space-y-1.5">
-                <div className="flex justify-between items-center text-body-sm">
-                  <span className="text-on-surface-variant font-medium">Volume Breakdown:</span>
-                  <span className="font-bold text-primary font-mono">
-                    {order.totalPieces || order.items?.reduce((s, i) => s + (i.quantity || 0), 0) || 0} pcs total
-                  </span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-surface-container-high text-label-sm text-on-surface-variant">
-                  {order.items?.map((item, idx) => (
-                    <span key={idx} className="flex items-center">
-                      <span className="material-symbols-outlined text-[14px] mr-1 text-on-surface-variant">straighten</span>
-                      {item.quantity} pcs • {item.size || item.dimension} ({item.productName || item.productTitle || 'Towel'})
+                {/* Logistics & Finance Info Grid */}
+                <div className="flex flex-wrap items-center justify-between text-body-sm gap-2">
+                  <div>
+                    <span className="text-label-sm font-label-sm text-on-surface-variant block font-bold uppercase">
+                      Consignment Value
                     </span>
-                  ))}
-                </div>
-              </div>
+                    <span className="text-title-md font-title-md font-bold text-primary font-mono">
+                      ₹{orderTotal.toLocaleString('en-IN')}
+                    </span>
+                    <span className="text-[10px] text-on-surface-variant block">
+                      Incl. 5% GST
+                    </span>
+                  </div>
 
-              {/* Logistics & Finance Info Grid */}
-              <div className="flex flex-wrap items-center justify-between text-body-sm gap-2">
-                <div>
-                  <span className="text-label-sm font-label-sm text-on-surface-variant block font-bold uppercase">
-                    Consignment Value
-                  </span>
-                  <span className="text-title-md font-title-md font-bold text-primary font-mono">
-                    ₹{orderTotal.toLocaleString('en-IN')}
-                  </span>
-                  <span className="text-[10px] text-on-surface-variant block">
-                    Incl. 5% GST
-                  </span>
+                  <div className="text-right">
+                    <span className="text-label-sm font-label-sm text-on-surface-variant block font-bold uppercase">
+                      Freight Carrier &amp; Payment
+                    </span>
+                    <span className="text-label-md font-label-md font-semibold text-primary flex items-center justify-end">
+                      <span className="material-symbols-outlined text-[15px] mr-1">local_shipping</span>
+                      {order.deliveryDetails?.transporter || order.transporter || 'VRL Logistics Cargo'}
+                    </span>
+                    <span className="text-[11px] text-on-surface-variant font-mono font-bold">
+                      {isPaid ? `PAID (${order.invoiceNumber || 'Invoiced'})` : 'PAYMENT PENDING'}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="text-right">
-                  <span className="text-label-sm font-label-sm text-on-surface-variant block font-bold uppercase">
-                    Freight Carrier &amp; Payment
-                  </span>
-                  <span className="text-label-md font-label-md font-semibold text-primary flex items-center justify-end">
-                    <span className="material-symbols-outlined text-[15px] mr-1">local_shipping</span>
-                    {order.deliveryDetails?.transporter || order.transporter || 'VRL Logistics Cargo'}
-                  </span>
-                  <span className="text-[11px] text-on-surface-variant font-mono font-bold">
-                    {isPaid ? `PAID (${order.invoiceNumber || 'Invoiced'})` : 'PAYMENT PENDING'}
-                  </span>
+                {/* Actions Cluster */}
+                <div className="pt-3 border-t border-surface-container flex flex-col space-y-2">
+                  <Link
+                    to={isPaid ? `/invoice/${order._id || orderNum}` : `/admin/orders`}
+                    className="w-full py-2 px-3 rounded-lg bg-primary-container text-on-primary font-label-lg text-label-lg font-bold flex items-center justify-center space-x-2 hover:bg-[#1E3A5F] active:scale-95 transition-transform"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">receipt</span>
+                    <span>{isPaid ? 'View Tax Invoice' : 'Manage & Confirm Payment'}</span>
+                  </Link>
                 </div>
-              </div>
-
-              {/* Actions Cluster */}
-              <div className="pt-3 border-t border-surface-container flex flex-col space-y-2">
-                <Link
-                  to={isPaid ? `/invoice/${order._id || orderNum}` : `/admin/orders`}
-                  className="w-full py-2 px-3 rounded-lg bg-primary-container text-on-primary font-label-lg text-label-lg font-bold flex items-center justify-center space-x-2 hover:bg-[#1E3A5F] active:scale-95 transition-transform"
-                >
-                  <span className="material-symbols-outlined text-[18px]">receipt</span>
-                  <span>{isPaid ? 'View Tax Invoice' : 'Manage & Confirm Payment'}</span>
-                </Link>
-              </div>
-            </article>
-          );
-        })}
+              </article>
+            );
+          })
+        )}
       </div>
     </div>
   );

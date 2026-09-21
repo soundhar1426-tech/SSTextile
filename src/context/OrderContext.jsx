@@ -11,10 +11,15 @@ const LOCAL_INVOICES_KEY = 'gtex_local_invoices';
 export const deduplicateOrders = (rawOrders) => {
   if (!Array.isArray(rawOrders)) return [];
   const map = new Map();
+
   rawOrders.forEach((o) => {
     if (!o) return;
-    const key = String(o.orderNumber || o._id || o.id || '').toUpperCase().trim();
+    const num = String(o.orderNumber || '').toUpperCase().trim();
+    const id = String(o._id || o.id || '').trim();
+    const digitsOnly = num.replace(/\D/g, '');
+    const key = (digitsOnly && digitsOnly.length >= 4 ? `num:${digitsOnly}` : '') || (id ? `id:${id}` : '') || num;
     if (!key) return;
+
     if (!map.has(key)) {
       map.set(key, o);
     } else {
@@ -23,12 +28,15 @@ export const deduplicateOrders = (rawOrders) => {
       const existingIsPaid = (existing.paymentStatus || '').toLowerCase() === 'paid';
       if (isPaid && !existingIsPaid) {
         map.set(key, { ...existing, ...o });
-      } else if (new Date(o.updatedAt || o.createdAt || 0) > new Date(existing.updatedAt || existing.createdAt || 0)) {
+      } else if (new Date(o.updatedAt || o.createdAt || 0) >= new Date(existing.updatedAt || existing.createdAt || 0)) {
         map.set(key, { ...existing, ...o });
       }
     }
   });
-  return Array.from(map.values());
+
+  return Array.from(map.values()).sort(
+    (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+  );
 };
 
 const getStoredOrders = () => {
@@ -95,18 +103,8 @@ export const OrderProvider = ({ children }) => {
     try {
       const response = await api.get('/orders');
       if (response.data?.success && Array.isArray(response.data.orders)) {
-        const liveOrders = response.data.orders;
-        updateOrdersState((prev) => {
-          const merged = [...liveOrders];
-          // Keep local orders that might not be in live database
-          prev.forEach((localOrd) => {
-            const exists = merged.some(
-              (m) => m._id === localOrd._id || m.orderNumber === localOrd.orderNumber
-            );
-            if (!exists) merged.push(localOrd);
-          });
-          return merged;
-        });
+        const liveOrders = deduplicateOrders(response.data.orders);
+        updateOrdersState(liveOrders);
       }
     } catch (err) {
       console.warn('[OrderContext] Fetch customer orders offline notice:', err.message);
@@ -131,17 +129,8 @@ export const OrderProvider = ({ children }) => {
 
         const response = await api.get('/admin/orders', { params });
         if (response.data?.success && Array.isArray(response.data.orders)) {
-          const liveOrders = response.data.orders;
-          updateOrdersState((prev) => {
-            const merged = [...liveOrders];
-            prev.forEach((localOrd) => {
-              const exists = merged.some(
-                (m) => m._id === localOrd._id || m.orderNumber === localOrd.orderNumber
-              );
-              if (!exists) merged.push(localOrd);
-            });
-            return merged;
-          });
+          const liveOrders = deduplicateOrders(response.data.orders);
+          updateOrdersState(liveOrders);
           if (response.data.stats) {
             setOrderStats(response.data.stats);
           }

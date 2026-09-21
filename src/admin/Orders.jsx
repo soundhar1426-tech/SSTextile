@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { useOrders } from '../context/OrderContext';
+import { useOrders, deduplicateOrders } from '../context/OrderContext';
 import { playNewOrderSound, requestNotificationPermission, showDesktopNotification } from '../utils/soundAlert';
 
 export const AdminOrders = () => {
@@ -22,6 +22,11 @@ export const AdminOrders = () => {
 
   const prevOrdersCountRef = useRef(null);
 
+  // Strictly deduplicated list of orders
+  const uniqueOrders = useMemo(() => {
+    return deduplicateOrders(orders || []);
+  }, [orders]);
+
   // Fetch admin orders with active filters & search
   useEffect(() => {
     fetchAdminOrders(filterStatus, filterPayment, filterInvoice, searchQuery);
@@ -36,9 +41,9 @@ export const AdminOrders = () => {
 
   // Detect new incoming order for audio and visual notification
   useEffect(() => {
-    if (orders && orders.length > 0) {
-      if (prevOrdersCountRef.current !== null && orders.length > prevOrdersCountRef.current) {
-        const latestOrder = orders[0];
+    if (uniqueOrders && uniqueOrders.length > 0) {
+      if (prevOrdersCountRef.current !== null && uniqueOrders.length > prevOrdersCountRef.current) {
+        const latestOrder = uniqueOrders[0];
         if (soundEnabled) {
           playNewOrderSound();
         }
@@ -106,12 +111,12 @@ export const AdminOrders = () => {
 
   // Compute stats fallback if not provided by backend stats object
   const computedStats = orderStats || {
-    totalOrders: orders.length,
-    newOrders: orders.filter(o => (o.orderStatus || '').toLowerCase() === 'new').length,
-    pendingPayments: orders.filter(o => (o.paymentStatus || '').toLowerCase() === 'pending').length,
-    paidOrders: orders.filter(o => (o.paymentStatus || '').toLowerCase() === 'paid').length,
-    processingOrders: orders.filter(o => ['processing', 'confirmed'].includes((o.orderStatus || '').toLowerCase())).length,
-    deliveredOrders: orders.filter(o => (o.orderStatus || '').toLowerCase() === 'delivered').length,
+    totalOrders: uniqueOrders.length,
+    newOrders: uniqueOrders.filter(o => (o.orderStatus || '').toLowerCase() === 'new').length,
+    pendingPayments: uniqueOrders.filter(o => (o.paymentStatus || '').toLowerCase() === 'pending').length,
+    paidOrders: uniqueOrders.filter(o => (o.paymentStatus || '').toLowerCase() === 'paid').length,
+    processingOrders: uniqueOrders.filter(o => ['processing', 'confirmed'].includes((o.orderStatus || '').toLowerCase())).length,
+    deliveredOrders: uniqueOrders.filter(o => (o.orderStatus || '').toLowerCase() === 'delivered').length,
   };
 
   return (
@@ -334,7 +339,7 @@ export const AdminOrders = () => {
           <div className="inline-block w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin mb-2"></div>
           <p className="text-body-sm">Loading wholesale orders...</p>
         </div>
-      ) : orders.length === 0 ? (
+      ) : uniqueOrders.length === 0 ? (
         <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant p-8 text-center space-y-2">
           <span className="material-symbols-outlined text-4xl text-outline">order_approve</span>
           <h3 className="text-title-md font-bold text-primary">No wholesale orders found</h3>
@@ -344,7 +349,7 @@ export const AdminOrders = () => {
         </div>
       ) : (
         <div className="space-y-4">
-          {orders.map((order) => {
+          {uniqueOrders.map((order) => {
             const isPaid = (order.paymentStatus || '').toLowerCase() === 'paid';
             const orderNum = order.orderNumber || order.id || `GTX-${order._id?.slice(-5)}`;
             const total = order.totalAmount || order.total || order.subtotal || 0;

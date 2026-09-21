@@ -22,7 +22,7 @@ const getInitialMillSettings = () => {
 };
 
 export const deduplicateCatalog = (rawProducts) => {
-  if (!Array.isArray(rawProducts) || rawProducts.length === 0) return initialProducts || [];
+  if (!Array.isArray(rawProducts) || rawProducts.length === 0) return [];
   const productMap = new Map();
 
   rawProducts.forEach((prod) => {
@@ -108,14 +108,14 @@ export const deduplicateCatalog = (rawProducts) => {
 const getInitialProducts = () => {
   try {
     const saved = localStorage.getItem('gtex_catalog_products');
-    if (saved) {
+    if (saved !== null) {
       const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         return deduplicateCatalog(parsed);
       }
     }
   } catch (e) {}
-  return deduplicateCatalog(initialProducts || []);
+  return [];
 };
 
 export const ProductProvider = ({ children }) => {
@@ -139,30 +139,24 @@ export const ProductProvider = ({ children }) => {
   /**
    * Fetch all active customer products and their dynamic sizes from MongoDB
    */
-  const fetchProducts = useCallback(async () => {
+  const fetchProducts = useCallback(async (forceRefresh = false) => {
     try {
       const storedUser = localStorage.getItem('gtex_user');
       const user = storedUser ? JSON.parse(storedUser) : null;
       const endpoint = user?.role === 'admin' ? '/admin/products' : '/products';
 
       const response = await api.get(endpoint);
-      if (response.data.success && Array.isArray(response.data.products) && response.data.products.length > 0) {
-        setProducts(response.data.products);
-        saveProductsLocally(response.data.products);
+      if (response.data?.success && Array.isArray(response.data.products)) {
+        const cleanList = deduplicateCatalog(response.data.products);
+        setProducts(cleanList);
+        saveProductsLocally(cleanList);
         setError(null);
-        return;
+        return cleanList;
       }
     } catch (err) {
       console.warn('[ProductContext] Backend fetch notice (using active catalog):', err.message);
+      setError(err.message);
     }
-
-    // Ensure state always has products
-    setProducts((prev) => {
-      if (prev && prev.length > 0) return prev;
-      const fallback = getInitialProducts();
-      saveProductsLocally(fallback);
-      return fallback;
-    });
   }, []);
 
   const productsRef = useRef(products);
@@ -289,6 +283,54 @@ export const ProductProvider = ({ children }) => {
     fetchMillSettings();
   }, [fetchProducts, fetchInventorySummary, fetchMillSettings]);
 
+  // Real-time multi-tab & window focus synchronization for product updates/deletions
+  useEffect(() => {
+    let channel;
+    try {
+      channel = new BroadcastChannel('sst_catalog_channel');
+      channel.onmessage = (event) => {
+        if (event.data?.type === 'PRODUCT_DELETED' || event.data?.type === 'CATALOG_UPDATED') {
+          fetchProducts(true);
+          fetchInventorySummary();
+        }
+      };
+    } catch (e) {}
+
+    const handleStorageChange = (e) => {
+      if (e.key === 'gtex_catalog_products') {
+        try {
+          const parsed = JSON.parse(e.newValue || '[]');
+          if (Array.isArray(parsed)) {
+            setProducts(deduplicateCatalog(parsed));
+          }
+        } catch (err) {}
+      }
+    };
+
+    const handleCustomProductDeleted = (e) => {
+      const deletedId = e.detail?.productId;
+      if (deletedId) {
+        setProducts((prev) => (prev || []).filter((p) => String(p._id || p.id) !== String(deletedId)));
+      }
+      fetchProducts(true);
+    };
+
+    const handleWindowFocus = () => {
+      fetchProducts(true);
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('sst_product_deleted', handleCustomProductDeleted);
+    window.addEventListener('focus', handleWindowFocus);
+
+    return () => {
+      if (channel) channel.close();
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('sst_product_deleted', handleCustomProductDeleted);
+      window.removeEventListener('focus', handleWindowFocus);
+    };
+  }, [fetchProducts, fetchInventorySummary]);
+
   /**
    * Create a new product
    */
@@ -383,22 +425,42 @@ export const ProductProvider = ({ children }) => {
   };
 
   /**
-   * Soft-delete / deactivate product
+   * Delete product permanently and synchronize across all tabs & pages
    */
   const deleteProduct = async (productId) => {
+    const cleanId = String(productId).trim();
+
+    // 1. Optimistic removal from state and local storage
     setProducts((prev) => {
-      const filtered = prev.filter((p) => String(p._id || p.id) !== String(productId));
+      const filtered = (prev || []).filter((p) => {
+        const pId = String(p._id || p.id).trim();
+        const pId2 = String(p.id || p._id).trim();
+        return pId !== cleanId && pId2 !== cleanId;
+      });
       saveProductsLocally(filtered);
       return filtered;
     });
 
+    // 2. Broadcast deletion across all open browser tabs & dispatch window event
     try {
-      await api.delete(`/admin/products/${productId}`);
+      const channel = new BroadcastChannel('sst_catalog_channel');
+      channel.postMessage({ type: 'PRODUCT_DELETED', productId: cleanId });
+      channel.close();
+    } catch (e) {}
+    window.dispatchEvent(new CustomEvent('sst_product_deleted', { detail: { productId: cleanId } }));
+
+    // 3. Delete from backend MongoDB
+    try {
+      const res = await api.delete(`/admin/products/${cleanId}`);
+      await fetchProducts(true);
+      await fetchInventorySummary();
+      return { success: true, message: res.data?.message };
     } catch (err) {
       console.warn('[ProductContext] Product deleted locally (backend sync notice):', err.message);
+      await fetchProducts(true);
+      await fetchInventorySummary();
+      return { success: true };
     }
-
-    return { success: true };
   };
 
   /**

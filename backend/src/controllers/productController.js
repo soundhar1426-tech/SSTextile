@@ -392,24 +392,43 @@ export const updateAdminProduct = async (req, res) => {
 export const deleteAdminProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const product = await Product.findById(id);
 
-    if (!product) {
-      return res.status(404).json({
+    if (!id) {
+      return res.status(400).json({
         success: false,
-        message: 'Product not found',
+        message: 'Product ID is required',
       });
     }
 
+    let product = null;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      product = await Product.findById(id);
+    }
+    if (!product) {
+      product = await Product.findOne({
+        $or: [{ _id: id }, { name: id }],
+      });
+    }
+
+    if (!product) {
+      return res.status(200).json({
+        success: true,
+        message: 'Product removed successfully.',
+      });
+    }
+
+    const productId = product._id;
+    const productName = product.name;
+
     // Permanently delete product
-    await Product.findByIdAndDelete(id);
+    await Product.findByIdAndDelete(productId);
 
     // Delete corresponding sizes
-    await Size.deleteMany({ product: id });
+    await Size.deleteMany({ product: productId });
 
     return res.status(200).json({
       success: true,
-      message: `Product "${product.name}" and its sizes have been removed successfully.`,
+      message: `Product "${productName}" and its sizes have been removed successfully.`,
     });
   } catch (error) {
     console.error('[ProductController] Error deleting product:', error);

@@ -31,6 +31,26 @@ export const CartProvider = ({ children }) => {
     }
   }, [cartItems]);
 
+  // Clean up cart items if a product is deleted
+  useEffect(() => {
+    const handleProductDeleted = (e) => {
+      const deletedId = e.detail?.productId;
+      if (deletedId) {
+        setCartItems((prev) =>
+          prev.filter(
+            (item) =>
+              String(item.productId) !== String(deletedId) &&
+              !String(item.cartItemId).startsWith(String(deletedId))
+          )
+        );
+      }
+    };
+    window.addEventListener('sst_product_deleted', handleProductDeleted);
+    return () => {
+      window.removeEventListener('sst_product_deleted', handleProductDeleted);
+    };
+  }, []);
+
   const showToast = (msg, type = 'info') => {
     setToastMessage({ text: msg, type });
     setTimeout(() => setToastMessage(null), 3500);

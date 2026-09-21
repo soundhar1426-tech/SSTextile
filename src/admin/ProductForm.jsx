@@ -60,12 +60,12 @@ export const ProductForm = () => {
                 String(p._id) === cleanId ||
                 (p.name && p.name.toLowerCase() === cleanId.toLowerCase()) ||
                 (p.title && p.title.toLowerCase() === cleanId.toLowerCase())
-            ) || parsed[0];
+            ) || null;
           }
         }
       } catch (e) {}
     }
-    return found || (list.length > 0 ? list[0] : null);
+    return found || null;
   };
 
   const initialProduct = getInitialProduct();

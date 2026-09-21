@@ -1,6 +1,12 @@
 import mongoose from 'mongoose';
-import bcrypt from 'bcryptjs';
-import { User, Product, Size, Order, OrderItem, Invoice } from '../models/index.js';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { User, Product, Size, Order, OrderItem, Invoice, Settings } from '../models/index.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/gowtham_tex';
 
@@ -32,19 +38,27 @@ const canonicalProducts = [
 
 async function cleanAndResetAllData() {
   console.log('\n========================================================');
-  console.log('🧹 GOWTHAM TEX — COMPLETE DATABASE DEDUPLICATION & RESET');
+  console.log('🧹 SSTextiles — COMPLETE DATABASE DEDUPLICATION & CLEANUP');
   console.log('========================================================\n');
 
-  await mongoose.connect(MONGODB_URI);
+  try {
+    await mongoose.connect(MONGODB_URI, {
+      serverSelectionTimeoutMS: 5000,
+    });
+    console.log('Connected to MongoDB.');
+  } catch (err) {
+    console.log('Notice: Connecting to local mongo fallback...');
+    await mongoose.connect('mongodb://127.0.0.1:27017/gowtham_tex');
+  }
 
   // 1. Clean Products & Sizes
-  console.log('--> Cleaning all duplicate / fragmented products and sizes...');
+  console.log('--> 1. Cleaning all duplicate and fragmented products/sizes...');
   await Product.deleteMany({});
   await Size.deleteMany({});
-  console.log('  ✓ Old products and sizes wiped.');
+  console.log('  ✓ Old products and sizes removed.');
 
   // 2. Seed pristine canonical products and sizes
-  console.log('--> Seeding clean canonical towel catalog...');
+  console.log('--> 2. Seeding clean canonical towel catalog (1 product, 9 unique sizes)...');
   for (const pData of canonicalProducts) {
     const { sizes, ...prodInfo } = pData;
     const product = await Product.create(prodInfo);
@@ -56,44 +70,70 @@ async function cleanAndResetAllData() {
         active: true,
       });
     }
-    console.log(`  ✓ Created clean product: "${product.name}" with ${sizes.length} dynamic sizes.`);
+    console.log(`  ✓ Created clean product: "${product.name}" with ${sizes.length} unique dynamic sizes.`);
   }
 
   // 3. Clean and ensure pristine Users
-  console.log('\n--> Ensuring pristine canonical users (Admin & Buyer)...');
+  console.log('\n--> 3. Ensuring pristine canonical users...');
   await User.deleteMany({});
 
   const admin = await User.create({
-    name: 'Gowtham Tex Mill Admin',
-    businessName: 'Gowtham Tex Mills',
-    email: 'admin@gowthamtex.com',
+    name: 'SSTextiles Mill Admin',
+    businessName: 'SSTextiles',
+    email: 'admin@sstextiles.com',
     password: 'admin123',
     role: 'admin',
-    phone: '+919566647825',
+    phone: '+919876543210',
     city: 'Erode',
     state: 'Tamil Nadu',
     pincode: '638052',
-    address: 'Shed No. 14, Loom Weaving Industrial Cluster, Perundurai Road',
+    address: '123 Textile Park, Perundurai Road, Erode - 638052, Tamil Nadu, India',
+    isVerified: true,
   });
   console.log(`  ✓ Created Admin: ${admin.email} / admin123 (Phone: ${admin.phone})`);
 
   const customer = await User.create({
     name: 'K. Rajendran',
     businessName: 'Surya Hotels & Resorts',
-    email: 'procurement@suryahotels.com',
+    email: 'buyer@sstextiles.com',
     password: 'customer123',
     role: 'customer',
-    phone: '+919842155670',
-    gstin: '33AAACG0184M1Z8',
+    phone: '+919876501234',
+    gstin: '33AAAAA9999Z1Z5',
     city: 'Erode',
     state: 'Tamil Nadu',
     pincode: '638001',
     address: '142 Brough Road, Near Railway Station Junction',
+    isVerified: true,
   });
   console.log(`  ✓ Created Customer: ${customer.email} / customer123 (Phone: ${customer.phone})`);
 
-  // 4. Clean all test orders and invoices
-  console.log('\n--> Wiping test orders and invoices for fresh testing...');
+  // 4. Clean duplicate and orphaned settings
+  console.log('\n--> 4. Resetting Mill Settings to SSTextiles defaults...');
+  await Settings.deleteMany({});
+  await Settings.create({
+    name: 'SSTextiles',
+    tagline: 'Direct-from-Mill Wholesale Terry Towel Consignments',
+    deityText: 'SHIVAM',
+    gstin: '33AAAAA0000A1Z5',
+    pan: 'AAAAA0000A',
+    stateCode: '33',
+    phone: '98765 43210, 98765 43211',
+    email: 'admin@sstextiles.com',
+    address: '123 Textile Park, Perundurai Road, Erode - 638052, Tamil Nadu, India',
+    bankDetails: {
+      accountName: 'SSTextiles',
+      bankName: 'State Bank of India',
+      branch: 'Erode Main Branch',
+      accountNumber: '30001234567',
+      ifsc: 'SBIN0001234',
+    },
+    isDefault: true,
+  });
+  console.log('  ✓ Mill Settings initialized cleanly.');
+
+  // 5. Clean duplicate orders and invoices
+  console.log('\n--> 5. Deduplicating and resetting test orders/invoices...');
   await Order.deleteMany({});
   await OrderItem.deleteMany({});
   await Invoice.deleteMany({});
@@ -105,11 +145,11 @@ async function cleanAndResetAllData() {
   const totalOrders = await Order.countDocuments();
 
   console.log('\n========================================================');
-  console.log('✨ FRESH CLEAN STATE SUMMARY:');
-  console.log(`   • Products in Catalog:  ${totalProducts} pristine products`);
+  console.log('✨ CLEAN DATABASE STATE:');
+  console.log(`   • Products in Catalog:  ${totalProducts} unique product(s)`);
   console.log(`   • Dynamic Sizes:        ${totalSizes} active size options`);
   console.log(`   • Clean Users:          ${totalUsers} (Admin & Customer)`);
-  console.log(`   • Orders:               ${totalOrders} (Ready for fresh testing)`);
+  console.log(`   • Orders:               ${totalOrders}`);
   console.log('========================================================\n');
 
   await mongoose.disconnect();

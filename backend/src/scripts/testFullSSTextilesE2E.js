@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import User from '../models/User.js';
 import Product from '../models/Product.js';
 import Order from '../models/Order.js';
+import OrderItem from '../models/OrderItem.js';
 import Invoice from '../models/Invoice.js';
 import Settings from '../models/Settings.js';
 import jwt from 'jsonwebtoken';
@@ -92,12 +93,12 @@ async function runE2ETest() {
   console.log('\n4️⃣ Testing Product Catalog & MOQ Constraints...');
   let product;
   if (mongoose.connection.readyState === 1) {
-    product = await Product.findOne({ title: { $regex: /hotel|bath|towel/i } });
+    product = await Product.findOne({ $or: [{ name: { $regex: /towel/i } }, { title: { $regex: /towel/i } }] });
     if (!product) {
       product = await Product.create({
-        title: 'SSTextiles Luxury Bath Towel',
+        name: 'White Towels',
         description: '100% Cotton 500 GSM Ring Spun Wholesale Towels',
-        category: 'Bath Towels',
+        category: 'White Towels',
         sizes: [
           {
             size: '75x150',
@@ -112,8 +113,8 @@ async function runE2ETest() {
         ],
       });
     }
-    console.log(`✅ Found/Created product: "${product.title}"`);
-    console.log(`   Size: ${product.sizes[0]?.dimension}, Price: ₹${product.sizes[0]?.price}, Stock: ${product.sizes[0]?.stock}`);
+    console.log(`✅ Found/Created product: "${product.name || product.title}"`);
+    console.log(`   Product ID: ${product._id}`);
   }
 
   // STEP 4: Placing Wholesale Order (Buyer Flow)
@@ -125,59 +126,88 @@ async function runE2ETest() {
   const gstAmount = Math.round(subtotal * gstRate * 100) / 100; // 360
   const totalAmount = subtotal + gstAmount; // 7,560
 
-  const orderData = {
-    orderNumber: `SST-${Math.floor(100000 + Math.random() * 900000)}`,
-    customer: {
+  let buyerUser = await User.findOne({ email: 'buyer@sstextiles.com' });
+  if (!buyerUser) {
+    buyerUser = await User.create({
       name: 'Ramesh Kumar',
       businessName: 'Ramesh Textiles & Hospitality',
-      email: 'ramesh.textiles@example.com',
-      phone: '9876501234',
-      gstin: '33AAAAA9999Z1Z5',
-    },
-    shippingAddress: {
-      street: '123 Market Road, Gandhi Nagar',
-      city: 'Erode',
-      state: 'Tamil Nadu',
-      pincode: '638001',
-    },
-    items: [
-      {
-        product: product?._id || 'mock-prod-id',
-        productTitle: 'SSTextiles Luxury Bath Towel',
-        size: '75x150 cm',
-        gsm: 500,
-        price: unitPrice,
-        quantity: qty,
-        total: subtotal,
-      },
-    ],
-    subtotal,
-    taxSummary: {
-      taxType: 'CGST_SGST',
-      taxableAmount: subtotal,
-      cgstRate: 2.5,
-      cgstAmount: gstAmount / 2,
-      sgstRate: 2.5,
-      sgstAmount: gstAmount / 2,
-      totalTax: gstAmount,
-    },
-    totalAmount,
-    orderStatus: 'new',
-    paymentStatus: 'pending',
-    paymentMethod: 'Direct Mill Bank Transfer (NEFT/RTGS/IMPS)',
-  };
+      email: 'buyer@sstextiles.com',
+      password: 'customer123',
+      role: 'customer',
+      phone: '+919876501234',
+      isVerified: true,
+    });
+  }
 
   let createdOrder;
   if (mongoose.connection.readyState === 1) {
-    createdOrder = await Order.create(orderData);
+    const orderNum = `SST-${Math.floor(100000 + Math.random() * 900000)}`;
+    const tempOrderId = new mongoose.Types.ObjectId();
+
+    const orderItem = await OrderItem.create({
+      order: tempOrderId,
+      product: product._id,
+      productName: product.name || 'White Towels',
+      size: '75x150',
+      quantity: qty,
+      price: unitPrice,
+      subtotal: subtotal,
+      unitPrice: unitPrice,
+      totalPrice: subtotal,
+      weightKg: 0.56,
+      gsm: 500,
+    });
+
+    createdOrder = await Order.create({
+      _id: tempOrderId,
+      orderNumber: orderNum,
+      customer: buyerUser._id,
+      customerDetails: {
+        name: buyerUser.name,
+        businessName: buyerUser.businessName,
+        email: buyerUser.email,
+        phone: buyerUser.phone,
+        gstin: '33AAAAA9999Z1Z5',
+        state: 'Tamil Nadu',
+        stateCode: '33',
+      },
+      shippingAddress: {
+        name: buyerUser.name,
+        phone: buyerUser.phone,
+        address: '123 Market Road, Gandhi Nagar',
+        city: 'Erode',
+        state: 'Tamil Nadu',
+        stateCode: '33',
+        pincode: '638001',
+      },
+      items: [orderItem._id],
+      totalPieces: qty,
+      totalWeightKg: 0.56 * qty,
+      balesCount: 1,
+      subtotal,
+      taxSummary: {
+        taxType: 'CGST_SGST',
+        taxableAmount: subtotal,
+        cgstRate: 2.5,
+        cgstAmount: gstAmount / 2,
+        sgstRate: 2.5,
+        sgstAmount: gstAmount / 2,
+        totalTax: gstAmount,
+      },
+      totalAmount,
+      orderStatus: 'new',
+      paymentStatus: 'pending',
+      paymentMethod: 'Direct Mill Bank Transfer (NEFT/RTGS/IMPS)',
+    });
+
     console.log(`✅ Order Placed Successfully! Order #${createdOrder.orderNumber}`);
-    console.log(`   Customer: ${createdOrder.customer.name} (${createdOrder.customer.businessName})`);
+    console.log(`   Customer: ${createdOrder.customerDetails.name} (${createdOrder.customerDetails.businessName})`);
     console.log(`   Items: ${qty} pcs @ ₹${unitPrice} = ₹${subtotal}`);
     console.log(`   GST (5%): ₹${gstAmount}`);
     console.log(`   Total Payable: ₹${totalAmount}`);
     console.log(`   Initial Status: ${createdOrder.orderStatus.toUpperCase()} | Payment: ${createdOrder.paymentStatus.toUpperCase()}`);
   } else {
-    createdOrder = { ...orderData, _id: 'mock-order-id' };
+    createdOrder = { orderNumber: `SST-123456`, totalAmount, _id: 'mock-order-id' };
     console.log(`✅ Order Placed Locally! Order #${createdOrder.orderNumber}`);
   }
 
@@ -202,29 +232,26 @@ async function runE2ETest() {
     invoice = await Invoice.create({
       invoiceNumber: invNumber,
       order: createdOrder._id,
-      millDetails: {
-        name: 'SSTextiles',
-        gstin: '33AAAAA0000A1Z5',
-        phone: '98765 43210, 98765 43211',
-        email: 'admin@sstextiles.com',
-        address: '123 Textile Park, Perundurai Road, Erode - 638052, Tamil Nadu, India',
-        bankDetails: {
-          accountName: 'SSTextiles',
-          bankName: 'State Bank of India',
-          branch: 'Erode Main Branch',
-          accountNumber: '30001234567',
-          ifsc: 'SBIN0001234',
+      customer: buyerUser._id,
+      customerDetails: {
+        name: createdOrder.customerDetails.name,
+        businessName: createdOrder.customerDetails.businessName,
+        gstin: createdOrder.customerDetails.gstin,
+        phone: createdOrder.customerDetails.phone,
+        email: createdOrder.customerDetails.email,
+        state: 'Tamil Nadu',
+        stateCode: '33',
+      },
+      items: [
+        {
+          product: product._id,
+          productName: product.name || 'White Towels',
+          size: '75x150',
+          quantity: qty,
+          unitPrice: unitPrice,
+          totalPrice: subtotal,
         },
-      },
-      buyerDetails: {
-        name: createdOrder.customer.name,
-        businessName: createdOrder.customer.businessName,
-        gstin: createdOrder.customer.gstin,
-        phone: createdOrder.customer.phone,
-        email: createdOrder.customer.email,
-        address: `${createdOrder.shippingAddress.street}, ${createdOrder.shippingAddress.city}, ${createdOrder.shippingAddress.state} - ${createdOrder.shippingAddress.pincode}`,
-      },
-      items: createdOrder.items,
+      ],
       subtotal: createdOrder.subtotal,
       totalAmount: createdOrder.totalAmount,
       status: 'PAID',
@@ -232,8 +259,7 @@ async function runE2ETest() {
 
     console.log(`✅ Payment Confirmed by Admin! Status: ${createdOrder.paymentStatus.toUpperCase()}`);
     console.log(`✅ Official GST Tax Invoice Generated: ${invoice.invoiceNumber}`);
-    console.log(`   Mill GSTIN: ${invoice.millDetails.gstin}`);
-    console.log(`   Buyer GSTIN: ${invoice.buyerDetails.gstin}`);
+    console.log(`   Buyer GSTIN: ${invoice.customerDetails.gstin}`);
     console.log(`   Total Invoiced: ₹${invoice.totalAmount.toLocaleString('en-IN')}`);
   } else {
     console.log('✅ Payment Confirmed and Tax Invoice Generated locally!');

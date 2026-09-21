@@ -8,10 +8,33 @@ const OrderContext = createContext();
 const LOCAL_ORDERS_KEY = 'gtex_local_orders';
 const LOCAL_INVOICES_KEY = 'gtex_local_invoices';
 
+export const deduplicateOrders = (rawOrders) => {
+  if (!Array.isArray(rawOrders)) return [];
+  const map = new Map();
+  rawOrders.forEach((o) => {
+    if (!o) return;
+    const key = String(o.orderNumber || o._id || o.id || '').toUpperCase().trim();
+    if (!key) return;
+    if (!map.has(key)) {
+      map.set(key, o);
+    } else {
+      const existing = map.get(key);
+      const isPaid = (o.paymentStatus || '').toLowerCase() === 'paid';
+      const existingIsPaid = (existing.paymentStatus || '').toLowerCase() === 'paid';
+      if (isPaid && !existingIsPaid) {
+        map.set(key, { ...existing, ...o });
+      } else if (new Date(o.updatedAt || o.createdAt || 0) > new Date(existing.updatedAt || existing.createdAt || 0)) {
+        map.set(key, { ...existing, ...o });
+      }
+    }
+  });
+  return Array.from(map.values());
+};
+
 const getStoredOrders = () => {
   try {
     const raw = localStorage.getItem(LOCAL_ORDERS_KEY);
-    return raw ? JSON.parse(raw) : [];
+    return raw ? deduplicateOrders(JSON.parse(raw)) : [];
   } catch (e) {
     return [];
   }
@@ -19,8 +42,12 @@ const getStoredOrders = () => {
 
 const saveStoredOrders = (orders) => {
   try {
-    localStorage.setItem(LOCAL_ORDERS_KEY, JSON.stringify(orders));
-  } catch (e) {}
+    const deduplicated = deduplicateOrders(orders);
+    localStorage.setItem(LOCAL_ORDERS_KEY, JSON.stringify(deduplicated));
+    return deduplicated;
+  } catch (e) {
+    return orders;
+  }
 };
 
 const getStoredInvoices = () => {

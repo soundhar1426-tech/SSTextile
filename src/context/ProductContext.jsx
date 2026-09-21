@@ -21,17 +21,67 @@ const getInitialMillSettings = () => {
   return millInfo;
 };
 
+export const deduplicateCatalog = (rawProducts) => {
+  if (!Array.isArray(rawProducts)) return initialProducts || [];
+  const productMap = new Map();
+
+  rawProducts.forEach((prod) => {
+    if (!prod) return;
+    const nameKey = (prod.name || prod.title || 'White Towels').toLowerCase().trim();
+    const existing = productMap.get(nameKey);
+
+    // Normalize and deduplicate sizes for this product
+    const sizeMap = new Map();
+    const existingSizes = existing ? (existing.sizes || []) : [];
+    const incomingSizes = prod.sizes || [];
+
+    [...existingSizes, ...incomingSizes].forEach((s) => {
+      if (!s) return;
+      const dimKey = String(s.size || s.dimension || '')
+        .toLowerCase()
+        .replace(/cm|inch|in/gi, '')
+        .replace(/[×*X]/g, 'x')
+        .replace(/\s+/g, '')
+        .trim();
+
+      if (!dimKey) return;
+      if (!sizeMap.has(dimKey)) {
+        sizeMap.set(dimKey, s);
+      } else {
+        const cur = sizeMap.get(dimKey);
+        if (Number(s.stock || 0) > Number(cur.stock || 0) || (s.grams && !cur.grams)) {
+          sizeMap.set(dimKey, { ...cur, ...s });
+        }
+      }
+    });
+
+    const uniqueSizes = Array.from(sizeMap.values()).sort((a, b) => (Number(a.price) || 0) - (Number(b.price) || 0));
+
+    if (!existing) {
+      productMap.set(nameKey, { ...prod, sizes: uniqueSizes });
+    } else {
+      productMap.set(nameKey, {
+        ...existing,
+        ...prod,
+        sizes: uniqueSizes,
+      });
+    }
+  });
+
+  return Array.from(productMap.values());
+};
+
 const getInitialProducts = () => {
   try {
     const saved = localStorage.getItem('gtex_catalog_products');
     if (saved) {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        return deduplicateCatalog(parsed);
       }
     }
   } catch (e) {}
-  return initialProducts || [];
+  return deduplicateCatalog(initialProducts || []);
 };
 
 export const ProductProvider = ({ children }) => {
@@ -44,8 +94,12 @@ export const ProductProvider = ({ children }) => {
 
   const saveProductsLocally = (newList) => {
     try {
-      localStorage.setItem('gtex_catalog_products', JSON.stringify(newList));
-    } catch (e) {}
+      const deduplicated = deduplicateCatalog(newList);
+      localStorage.setItem('gtex_catalog_products', JSON.stringify(deduplicated));
+      return deduplicated;
+    } catch (e) {
+      return newList;
+    }
   };
 
   /**

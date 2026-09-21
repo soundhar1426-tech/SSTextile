@@ -11,43 +11,47 @@ export const Profile = () => {
 
   const isUserAdmin = isAdmin || currentUser?.role === 'admin';
 
-  const [formData, setFormData] = useState({
-    name: '',
-    businessName: '',
-    phone: '',
-    email: '',
-    gstin: '',
-    address: '',
-    city: '',
-    state: '',
-    stateCode: '',
-    pincode: '',
+  const [formData, setFormData] = useState(() => ({
+    name: currentUser?.name || '',
+    businessName: currentUser?.businessName || (isUserAdmin ? millSettings?.name : '') || '',
+    phone: currentUser?.phone || (isUserAdmin ? millSettings?.phone : '') || '',
+    email: currentUser?.email || '',
+    gstin: currentUser?.gstin || (isUserAdmin ? millSettings?.gstin : '') || '',
+    address: currentUser?.address || '',
+    city: currentUser?.city || '',
+    state: currentUser?.state || (isUserAdmin ? (millSettings?.stateCode ? 'Tamil Nadu' : '') : '') || '',
+    stateCode: currentUser?.stateCode || (isUserAdmin ? millSettings?.stateCode : '') || '',
+    pincode: currentUser?.pincode || '',
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
-  });
+  }));
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
   const [showPasswordSection, setShowPasswordSection] = useState(false);
+  const hasInitializedRef = React.useRef(false);
 
-  // Hydrate formData when currentUser or millSettings loads
+  // Hydrate formData only once on initial load
   useEffect(() => {
-    if (currentUser) {
-      setFormData((prev) => ({
-        ...prev,
-        name: currentUser.name || '',
-        businessName: currentUser.businessName || (isUserAdmin ? millSettings?.name : '') || '',
-        phone: currentUser.phone || (isUserAdmin ? millSettings?.phone : '') || '',
-        email: currentUser.email || '',
-        gstin: currentUser.gstin || (isUserAdmin ? millSettings?.gstin : '') || '',
-        address: currentUser.address || '',
-        city: currentUser.city || '',
-        state: currentUser.state || (isUserAdmin ? (millSettings?.stateCode ? 'Tamil Nadu' : '') : '') || '',
-        stateCode: currentUser.stateCode || (isUserAdmin ? millSettings?.stateCode : '') || '',
-        pincode: currentUser.pincode || '',
-      }));
+    if (!hasInitializedRef.current && (currentUser || millSettings)) {
+      hasInitializedRef.current = true;
+      setFormData({
+        name: currentUser?.name || '',
+        businessName: currentUser?.businessName || (isUserAdmin ? millSettings?.name : '') || '',
+        phone: currentUser?.phone || (isUserAdmin ? millSettings?.phone : '') || '',
+        email: currentUser?.email || '',
+        gstin: currentUser?.gstin || (isUserAdmin ? millSettings?.gstin : '') || '',
+        address: currentUser?.address || '',
+        city: currentUser?.city || '',
+        state: currentUser?.state || (isUserAdmin ? (millSettings?.stateCode ? 'Tamil Nadu' : '') : '') || '',
+        stateCode: currentUser?.stateCode || (isUserAdmin ? millSettings?.stateCode : '') || '',
+        pincode: currentUser?.pincode || '',
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      });
     }
   }, [currentUser, isUserAdmin, millSettings]);
 
@@ -276,7 +280,7 @@ export const Profile = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-label-sm font-bold text-on-surface-variant mb-1">
+              <label className="block text-label-sm font-bold text-primary mb-1">
                 Full Name / Contact Person *
               </label>
               <input
@@ -286,12 +290,12 @@ export const Profile = () => {
                 value={formData.name}
                 onChange={handleChange}
                 placeholder="e.g. Vignesh Kumar"
-                className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3.5 py-2.5 text-body-sm text-primary font-medium focus:border-primary-container focus:bg-white outline-none transition-all"
+                className="w-full bg-surface-container-lowest border border-outline-variant hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/15 rounded-xl px-3.5 py-2.5 text-body-md text-primary font-medium outline-none transition-all shadow-2xs"
               />
             </div>
 
             <div>
-              <label className="block text-label-sm font-bold text-on-surface-variant mb-1">
+              <label className="block text-label-sm font-bold text-primary mb-1">
                 Company / Business / Trade Name
               </label>
               <input
@@ -300,12 +304,12 @@ export const Profile = () => {
                 value={formData.businessName}
                 onChange={handleChange}
                 placeholder="e.g. Green Park Hotels Pvt Ltd"
-                className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3.5 py-2.5 text-body-sm text-primary font-medium focus:border-primary-container focus:bg-white outline-none transition-all"
+                className="w-full bg-surface-container-lowest border border-outline-variant hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/15 rounded-xl px-3.5 py-2.5 text-body-md text-primary font-medium outline-none transition-all shadow-2xs"
               />
             </div>
 
             <div>
-              <label className="block text-label-sm font-bold text-on-surface-variant mb-1">
+              <label className="block text-label-sm font-bold text-primary mb-1">
                 Contact Phone / WhatsApp *
               </label>
               <input
@@ -315,12 +319,12 @@ export const Profile = () => {
                 value={formData.phone}
                 onChange={handleChange}
                 placeholder="+91 98427 99999"
-                className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3.5 py-2.5 text-body-sm text-primary font-medium focus:border-primary-container focus:bg-white outline-none transition-all"
+                className="w-full bg-surface-container-lowest border border-outline-variant hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/15 rounded-xl px-3.5 py-2.5 text-body-md text-primary font-medium outline-none transition-all shadow-2xs"
               />
             </div>
 
             <div>
-              <label className="block text-label-sm font-bold text-on-surface-variant mb-1">
+              <label className="block text-label-sm font-bold text-primary mb-1">
                 Registered Email Address *
               </label>
               <input
@@ -330,9 +334,9 @@ export const Profile = () => {
                 value={formData.email}
                 onChange={handleChange}
                 placeholder="e.g. admin@sstextiles.com"
-                className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3.5 py-2.5 text-body-sm text-primary font-medium focus:border-primary-container focus:bg-white outline-none transition-all"
+                className="w-full bg-surface-container-lowest border border-outline-variant hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/15 rounded-xl px-3.5 py-2.5 text-body-md text-primary font-medium outline-none transition-all shadow-2xs"
               />
-              <span className="text-[11px] text-outline mt-1 block">Used to sign in to your account</span>
+              <span className="text-[11px] text-on-surface-variant mt-1 block">Used to sign in to your account</span>
             </div>
           </div>
         </section>

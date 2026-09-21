@@ -21,24 +21,22 @@ export const AdminSettings = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  // Sync settings when millSettings loads or changes in ProductContext
+  const hasInitializedRef = React.useRef(false);
+
+  // Sync initial settings only once on mount / initial load
   useEffect(() => {
-    if (millSettings) {
-      setSettings(millSettings);
-      if (!adminEmail && millSettings.email) {
-        setAdminEmail(millSettings.email);
+    if (!hasInitializedRef.current) {
+      if (millSettings || currentUser) {
+        hasInitializedRef.current = true;
+        if (millSettings) setSettings(millSettings);
+        if (currentUser?.email) setAdminEmail(currentUser.email);
+        else if (millSettings?.email) setAdminEmail(millSettings.email);
+        if (currentUser?.name) setAdminName(currentUser.name);
+        if (currentUser?.phone) setAdminPhone(currentUser.phone);
+        else if (millSettings?.phone) setAdminPhone(millSettings.phone);
       }
     }
-  }, [millSettings]);
-
-  // Sync admin user details from AuthContext
-  useEffect(() => {
-    if (currentUser) {
-      setAdminEmail(currentUser.email || '');
-      setAdminName(currentUser.name || '');
-      setAdminPhone(currentUser.phone || '');
-    }
-  }, [currentUser]);
+  }, [millSettings, currentUser]);
 
   const handleSaveSettings = async (e) => {
     e.preventDefault();
@@ -168,7 +166,7 @@ export const AdminSettings = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-label-sm font-bold text-on-surface-variant mb-1">
+              <label className="block text-label-sm font-bold text-primary mb-1">
                 Admin Sign-in Email Address *
               </label>
               <input
@@ -177,15 +175,15 @@ export const AdminSettings = () => {
                 value={adminEmail}
                 onChange={(e) => setAdminEmail(e.target.value)}
                 placeholder="admin@sstextiles.com"
-                className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3.5 py-2.5 text-body-sm text-primary font-medium focus:border-primary-container focus:bg-white outline-none transition-all"
+                className="w-full bg-surface-container-lowest border border-outline-variant hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/15 rounded-xl px-3.5 py-2.5 text-body-md text-primary font-medium outline-none transition-all shadow-2xs"
               />
-              <span className="text-[11px] text-outline mt-1 block">
+              <span className="text-[11px] text-on-surface-variant mt-1 block">
                 Used to log in to the SSTextiles Admin Portal and receive automated dispatch alerts.
               </span>
             </div>
 
             <div>
-              <label className="block text-label-sm font-bold text-on-surface-variant mb-1">
+              <label className="block text-label-sm font-bold text-primary mb-1">
                 Administrator Name / Representative *
               </label>
               <input
@@ -194,9 +192,9 @@ export const AdminSettings = () => {
                 value={adminName}
                 onChange={(e) => setAdminName(e.target.value)}
                 placeholder="e.g. Soundhar / SSTextiles Admin"
-                className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3.5 py-2.5 text-body-sm text-primary font-medium focus:border-primary-container focus:bg-white outline-none transition-all"
+                className="w-full bg-surface-container-lowest border border-outline-variant hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/15 rounded-xl px-3.5 py-2.5 text-body-md text-primary font-medium outline-none transition-all shadow-2xs"
               />
-              <span className="text-[11px] text-outline mt-1 block">
+              <span className="text-[11px] text-on-surface-variant mt-1 block">
                 Primary name displayed on admin badges and dispatch approvals.
               </span>
             </div>
@@ -204,7 +202,7 @@ export const AdminSettings = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
             <div>
-              <label className="block text-label-sm font-bold text-on-surface-variant mb-1">
+              <label className="block text-label-sm font-bold text-primary mb-1">
                 Admin Mobile / WhatsApp Hotline
               </label>
               <input
@@ -212,7 +210,7 @@ export const AdminSettings = () => {
                 value={adminPhone}
                 onChange={(e) => setAdminPhone(e.target.value)}
                 placeholder="+91 98765 43210"
-                className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3.5 py-2.5 text-body-sm text-primary font-medium focus:border-primary-container focus:bg-white outline-none transition-all"
+                className="w-full bg-surface-container-lowest border border-outline-variant hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/15 rounded-xl px-3.5 py-2.5 text-body-md text-primary font-medium outline-none transition-all shadow-2xs"
               />
             </div>
 

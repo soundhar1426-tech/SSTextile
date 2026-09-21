@@ -5,7 +5,7 @@ import { useProducts } from '../context/ProductContext';
 import { millInfo } from '../data/mockData';
 
 export const AdminLayout = () => {
-  const { isAdmin, logoutAdmin } = useAuth();
+  const { isAdmin, currentUser, logoutAdmin } = useAuth();
   const { millSettings } = useProducts();
   const currentMill = millSettings || millInfo;
   const navigate = useNavigate();
@@ -116,12 +116,34 @@ export const AdminLayout = () => {
             </nav>
           </div>
 
-          <div className="bg-surface-container-low p-3 rounded-lg border border-outline-variant space-y-1 text-label-sm">
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-primary">Tiruppur Towel Manufacturer</span>
-              <span className="bg-secondary-fixed text-secondary px-1.5 py-0.2 rounded font-mono text-[10px] font-bold">WH-B1</span>
+          <div className="bg-surface-container-low p-3.5 rounded-xl border border-outline-variant space-y-2.5 text-label-sm">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center font-bold text-xs shadow-xs uppercase">
+                {currentUser?.name ? currentUser.name.charAt(0) : 'A'}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-bold text-primary text-xs truncate leading-tight">
+                  {currentUser?.name || 'Mill Administrator'}
+                </p>
+                <p className="text-[11px] text-on-surface-variant truncate font-mono">
+                  {currentUser?.email || millSettings?.email || 'admin@sstextiles.com'}
+                </p>
+              </div>
             </div>
 
+            <div className="pt-2 border-t border-outline-variant/60 flex items-center justify-between text-[11px]">
+              <Link
+                to="/admin/settings"
+                className="text-secondary font-bold hover:underline flex items-center gap-1 transition-colors"
+                title="Edit administrator name, login email, password, and mill details"
+              >
+                <span className="material-symbols-outlined text-[14px]">edit</span>
+                <span>Edit Admin Details</span>
+              </Link>
+              <span className="bg-secondary-container/40 text-secondary border border-secondary/30 px-1.5 py-0.2 rounded font-mono text-[9px] font-bold">
+                ADMIN
+              </span>
+            </div>
           </div>
         </aside>
 

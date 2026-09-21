@@ -224,17 +224,32 @@ export const confirmOrderPayment = async (req, res) => {
   try {
     const rawId = String(req.params.id || '').trim();
     const cleanId = rawId.replace(/^draft-/i, '').trim();
-    const { paymentMethod = 'UPI', paymentReference = '', amount } = req.body;
+    const { paymentMethod = 'UPI', paymentReference = '', amount, orderNumber: bodyOrderNumber } = req.body;
 
-    let query;
+    let order = null;
+
+    // 1. Try finding Order by valid ObjectId
     if (mongoose.Types.ObjectId.isValid(cleanId)) {
-      query = { _id: cleanId };
-    } else {
-      query = { orderNumber: cleanId.toUpperCase() };
+      order = await Order.findById(cleanId).populate('items').populate('customer');
     }
 
-    let order = await Order.findOne(query).populate('items').populate('customer');
+    // 2. Try finding by orderNumber variants
+    if (!order) {
+      const candidates = [
+        cleanId.toUpperCase(),
+        rawId.toUpperCase(),
+        bodyOrderNumber ? String(bodyOrderNumber).toUpperCase().trim() : null,
+      ].filter(Boolean);
 
+      order = await Order.findOne({
+        $or: [
+          { orderNumber: { $in: candidates } },
+          { _id: mongoose.Types.ObjectId.isValid(cleanId) ? cleanId : null },
+        ],
+      }).populate('items').populate('customer');
+    }
+
+    // 3. Try finding via Invoice document
     if (!order) {
       const invQuery = mongoose.Types.ObjectId.isValid(cleanId)
         ? { _id: cleanId }
@@ -242,11 +257,22 @@ export const confirmOrderPayment = async (req, res) => {
             $or: [
               { invoiceNumber: rawId.toUpperCase() },
               { invoiceNumber: cleanId.toUpperCase() },
+              { invoiceNumber: `GTX-INV-${cleanId.replace(/\D/g, '')}` },
             ],
           };
       const inv = await Invoice.findOne(invQuery);
       if (inv && inv.order) {
         order = await Order.findById(inv.order).populate('items').populate('customer');
+      }
+    }
+
+    // 4. Try finding by matching numeric digits of order number
+    if (!order) {
+      const digits = cleanId.replace(/\D/g, '');
+      if (digits && digits.length >= 4) {
+        order = await Order.findOne({
+          orderNumber: new RegExp(digits, 'i'),
+        }).populate('items').populate('customer');
       }
     }
 

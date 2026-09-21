@@ -63,45 +63,52 @@ export const playNewOrderSound = () => {
     const ctx = getAudioContext();
     if (!ctx) return;
 
+    const playTones = (audioCtx) => {
+      const now = audioCtx.currentTime;
+
+      // --- POP 1: Low-to-high juicy bubble pop ---
+      const osc1 = audioCtx.createOscillator();
+      const gain1 = audioCtx.createGain();
+      osc1.type = 'sine';
+      // Rapid upward frequency swoop characteristic of a bubble pop
+      osc1.frequency.setValueAtTime(450, now);
+      osc1.frequency.exponentialRampToValueAtTime(1200, now + 0.05);
+
+      gain1.gain.setValueAtTime(0.6, now);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+      osc1.connect(gain1);
+      gain1.connect(audioCtx.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.08);
+
+      // --- POP 2: Crisp snappy transient pop (slightly offset for double pop effect) ---
+      const pop2Time = now + 0.07;
+      const osc2 = audioCtx.createOscillator();
+      const gain2 = audioCtx.createGain();
+      osc2.type = 'sine';
+      // Higher pitch snap for that tactile message pop
+      osc2.frequency.setValueAtTime(750, pop2Time);
+      osc2.frequency.exponentialRampToValueAtTime(1800, pop2Time + 0.04);
+
+      gain2.gain.setValueAtTime(0.7, pop2Time);
+      gain2.gain.exponentialRampToValueAtTime(0.001, pop2Time + 0.09);
+
+      osc2.connect(gain2);
+      gain2.connect(audioCtx.destination);
+      osc2.start(pop2Time);
+      osc2.stop(pop2Time + 0.09);
+    };
+
     if (ctx.state === 'suspended') {
-      ctx.resume().catch(() => {});
+      ctx.resume().then(() => {
+        playTones(ctx);
+      }).catch(() => {
+        playTones(ctx);
+      });
+    } else {
+      playTones(ctx);
     }
-
-    const now = ctx.currentTime;
-
-    // --- POP 1: Low-to-high juicy bubble pop ---
-    const osc1 = ctx.createOscillator();
-    const gain1 = ctx.createGain();
-    osc1.type = 'sine';
-    // Rapid upward frequency swoop characteristic of a bubble pop
-    osc1.frequency.setValueAtTime(450, now);
-    osc1.frequency.exponentialRampToValueAtTime(1200, now + 0.05);
-
-    gain1.gain.setValueAtTime(0.6, now);
-    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
-
-    osc1.connect(gain1);
-    gain1.connect(ctx.destination);
-    osc1.start(now);
-    osc1.stop(now + 0.08);
-
-    // --- POP 2: Crisp snappy transient pop (slightly offset for double pop effect) ---
-    const pop2Time = now + 0.07;
-    const osc2 = ctx.createOscillator();
-    const gain2 = ctx.createGain();
-    osc2.type = 'sine';
-    // Higher pitch snap for that tactile message pop
-    osc2.frequency.setValueAtTime(750, pop2Time);
-    osc2.frequency.exponentialRampToValueAtTime(1800, pop2Time + 0.04);
-
-    gain2.gain.setValueAtTime(0.7, pop2Time);
-    gain2.gain.exponentialRampToValueAtTime(0.001, pop2Time + 0.09);
-
-    osc2.connect(gain2);
-    gain2.connect(ctx.destination);
-    osc2.start(pop2Time);
-    osc2.stop(pop2Time + 0.09);
-
   } catch (err) {
     console.warn('[Pop Sound Alert] Sound playback notice:', err);
   }

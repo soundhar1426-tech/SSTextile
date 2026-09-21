@@ -241,19 +241,24 @@ export const AdminLayout = () => {
 
         {/* Page Content Outlet */}
         <main className="flex-1 p-4 md:p-6 max-w-6xl mx-auto w-full pb-24 space-y-4">
-          {/* Global Sticky Real-Time New Order Banner */}
+          {/* Global Sticky Real-Time New Order Banner / Pop Msg */}
           {newOrderAlert && (
-            <div className="p-4 bg-[#E6F5F0] border-2 border-secondary-fixed rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-lg animate-bounce sticky top-16 z-30">
-              <div className="flex items-center gap-3">
-                <span className="w-10 h-10 rounded-full bg-secondary text-white flex items-center justify-center font-bold shrink-0">
-                  <span className="material-symbols-outlined">notifications_active</span>
+            <div className="p-4 bg-gradient-to-r from-[#E6F5F0] to-[#DCFCE7] border-2 border-secondary-fixed rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-xl sticky top-16 z-50 animate-in fade-in slide-in-from-top-4 duration-300">
+              <div className="flex items-center gap-3.5">
+                <span className="w-11 h-11 rounded-xl bg-secondary text-white flex items-center justify-center font-bold shrink-0 shadow-md ring-4 ring-secondary/20">
+                  <span className="material-symbols-outlined text-2xl animate-pulse">notifications_active</span>
                 </span>
                 <div>
-                  <p className="font-bold text-primary text-body-md">
-                    🔔 NEW WHOLESALE ORDER #{newOrderAlert.orderNumber || newOrderAlert.id} PLACED!
-                  </p>
-                  <p className="text-xs text-secondary font-semibold">
-                    Buyer: {newOrderAlert.customerDetails?.businessName || newOrderAlert.customerDetails?.name || 'Customer'} • Total: ₹{Number(newOrderAlert.totalAmount || newOrderAlert.total || 0).toLocaleString('en-IN')} • Carrier: {newOrderAlert.deliveryDetails?.transporter || 'VRL Logistics'}
+                  <div className="flex items-center gap-2">
+                    <span className="bg-secondary text-white text-[10px] font-bold font-mono px-2 py-0.5 rounded-full uppercase tracking-wider">
+                      Live Wholesale Pop
+                    </span>
+                    <p className="font-bold text-primary text-body-md">
+                      🔔 NEW ORDER #{newOrderAlert.orderNumber || newOrderAlert.id} PLACED!
+                    </p>
+                  </div>
+                  <p className="text-xs text-secondary font-semibold mt-0.5">
+                    Buyer: <strong className="text-primary">{newOrderAlert.customerDetails?.businessName || newOrderAlert.customerDetails?.name || 'Customer'}</strong> • Consignment: <strong className="font-mono text-primary">₹{Number(newOrderAlert.totalAmount || newOrderAlert.total || 0).toLocaleString('en-IN')}</strong> ({newOrderAlert.totalPieces || newOrderAlert.items?.reduce((s, i) => s + (i.quantity || 0), 0) || 0} pcs) • Transporter: {newOrderAlert.deliveryDetails?.transporter || 'VRL Logistics'}
                   </p>
                 </div>
               </div>
@@ -261,15 +266,15 @@ export const AdminLayout = () => {
                 <Link
                   to={`/admin/orders?checkOrder=${newOrderAlert._id || newOrderAlert.orderNumber || newOrderAlert.id}`}
                   onClick={clearNewOrderAlert}
-                  className="px-3.5 py-1.5 bg-primary text-white rounded-lg text-label-sm font-bold shadow hover:bg-primary/90 flex items-center gap-1 cursor-pointer transition-all"
+                  className="px-4 py-2 bg-secondary hover:bg-secondary/90 text-white rounded-xl text-label-sm font-bold shadow-md hover:shadow-lg flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
                 >
-                  <span className="material-symbols-outlined text-sm">fact_check</span>
+                  <span className="material-symbols-outlined text-base">fact_check</span>
                   <span>Check Bill &amp; Confirm</span>
                 </Link>
                 <button
                   type="button"
                   onClick={clearNewOrderAlert}
-                  className="px-3 py-1.5 bg-surface-container border border-outline-variant text-on-surface-variant rounded-lg text-label-sm font-bold hover:bg-surface-container-high cursor-pointer transition-all"
+                  className="px-3 py-2 bg-white/80 border border-secondary/30 text-primary rounded-xl text-label-sm font-bold hover:bg-white cursor-pointer transition-all"
                 >
                   Dismiss
                 </button>

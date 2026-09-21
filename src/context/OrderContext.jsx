@@ -33,11 +33,16 @@ export const deduplicateOrders = (rawOrders) => {
       const existing = map.get(key);
       const isPaid = (o.paymentStatus || '').toLowerCase() === 'paid';
       const existingIsPaid = (existing.paymentStatus || '').toLowerCase() === 'paid';
-      if (isPaid && !existingIsPaid) {
-        map.set(key, { ...existing, ...o });
-      } else if (new Date(o.updatedAt || o.createdAt || 0) >= new Date(existing.updatedAt || existing.createdAt || 0)) {
-        map.set(key, { ...existing, ...o });
+
+      let merged = { ...existing, ...o };
+      if (isPaid || existingIsPaid) {
+        merged.paymentStatus = 'paid';
+        merged.invoiceNumber = o.invoiceNumber || existing.invoiceNumber;
+        if (merged.orderStatus === 'new') {
+          merged.orderStatus = 'confirmed';
+        }
       }
+      map.set(key, merged);
     }
   });
 
@@ -194,16 +199,6 @@ export const OrderProvider = ({ children }) => {
     [token, isAdmin, soundEnabled, updateOrdersState]
   );
 
-  // Initialize seed list of order IDs into seen set
-  useEffect(() => {
-    const stored = getStoredOrders();
-    stored.forEach((o) => {
-      if (o._id) seenOrderIdsRef.current.add(o._id);
-      if (o.id) seenOrderIdsRef.current.add(o.id);
-      if (o.orderNumber) seenOrderIdsRef.current.add(o.orderNumber);
-    });
-  }, []);
-
   // Request browser notification permissions on mount
   useEffect(() => {
     requestNotificationPermission();
@@ -215,23 +210,55 @@ export const OrderProvider = ({ children }) => {
 
     if (isAdmin) {
       fetchAdminOrders();
-      // Fast 4-second polling for immediate reflection of new orders placed by buyers
+      // Fast 3-second polling for immediate reflection of new orders placed by buyers
       const adminInterval = setInterval(() => {
         fetchAdminOrders();
-      }, 4000);
+      }, 3000);
       return () => clearInterval(adminInterval);
     } else {
       fetchCustomerOrders();
-      // 5-second polling for buyer portal to reflect confirmed bills & invoices
+      // 4-second polling for buyer portal to reflect confirmed bills & invoices
       const buyerInterval = setInterval(() => {
         fetchCustomerOrders();
-      }, 5000);
+      }, 4000);
       return () => clearInterval(buyerInterval);
     }
   }, [token, isAdmin, fetchCustomerOrders, fetchAdminOrders]);
 
-  // Cross-tab & intra-window real-time event listeners
+  // BroadcastChannel & Cross-tab real-time event listeners
   useEffect(() => {
+    let orderChannel = null;
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        orderChannel = new BroadcastChannel('sst_orders_channel');
+        orderChannel.onmessage = (event) => {
+          const data = event.data;
+          if (data?.type === 'NEW_ORDER_PLACED' && data.order) {
+            updateOrdersState((prev) => [data.order, ...prev]);
+            if (isAdmin) {
+              if (soundEnabled) {
+                playNewOrderSound();
+              }
+              setNewOrderAlert(data.order);
+              showDesktopNotification(
+                '🚨 New Wholesale Order Received!',
+                `Order #${data.order.orderNumber || data.order.id} for ₹${Number(data.order.totalAmount || data.order.total || 0).toLocaleString('en-IN')}`
+              );
+              fetchAdminOrders();
+            }
+          } else if (data?.type === 'ORDER_STATUS_UPDATED') {
+            if (isAdmin) {
+              fetchAdminOrders();
+            } else {
+              fetchCustomerOrders();
+            }
+          }
+        };
+      }
+    } catch (e) {
+      console.warn('[OrderContext] BroadcastChannel initialization note:', e);
+    }
+
     const handleNewOrderPlacedEvent = (event) => {
       const order = event.detail?.order;
       if (order) {
@@ -253,7 +280,7 @@ export const OrderProvider = ({ children }) => {
       const { order, invoice } = event.detail || {};
       if (order) {
         updateOrdersState((prev) =>
-          prev.map((o) => (o._id === order._id || o.orderNumber === order.orderNumber ? { ...o, ...order } : o))
+          prev.map((o) => (o._id === order._id || o.orderNumber === order.orderNumber ? { ...o, ...order, paymentStatus: 'paid' } : o))
         );
       }
       if (invoice) {
@@ -282,6 +309,7 @@ export const OrderProvider = ({ children }) => {
                 '🚨 New Wholesale Order Received!',
                 `Order #${data.order.orderNumber || data.order.id} for ₹${Number(data.order.totalAmount || data.order.total || 0).toLocaleString('en-IN')}`
               );
+              fetchAdminOrders();
             }
           }
         } catch (err) {}
@@ -306,6 +334,9 @@ export const OrderProvider = ({ children }) => {
     window.addEventListener('storage', handleStorageChange);
 
     return () => {
+      if (orderChannel) {
+        orderChannel.close();
+      }
       window.removeEventListener('sst_new_order_placed', handleNewOrderPlacedEvent);
       window.removeEventListener('sst_order_status_updated', handleOrderStatusUpdatedEvent);
       window.removeEventListener('storage', handleStorageChange);
@@ -346,6 +377,14 @@ export const OrderProvider = ({ children }) => {
       }
 
       // Broadcast new order event immediately across tabs & window
+      try {
+        if ('BroadcastChannel' in window) {
+          const ch = new BroadcastChannel('sst_orders_channel');
+          ch.postMessage({ type: 'NEW_ORDER_PLACED', order: localOrder });
+          setTimeout(() => ch.close(), 1000);
+        }
+      } catch (e) {}
+
       window.dispatchEvent(
         new CustomEvent('sst_new_order_placed', {
           detail: { order: localOrder },
@@ -371,6 +410,14 @@ export const OrderProvider = ({ children }) => {
 
         // Update broadcast with verified backend order
         if (typeof window !== 'undefined') {
+          try {
+            if ('BroadcastChannel' in window) {
+              const ch = new BroadcastChannel('sst_orders_channel');
+              ch.postMessage({ type: 'NEW_ORDER_PLACED', order: newOrder });
+              setTimeout(() => ch.close(), 1000);
+            }
+          } catch (e) {}
+
           window.dispatchEvent(
             new CustomEvent('sst_new_order_placed', {
               detail: { order: newOrder },
@@ -650,10 +697,19 @@ export const OrderProvider = ({ children }) => {
     saveStoredInvoice(invNum, localInvoice);
     if (targetOrder?._id) saveStoredInvoice(targetOrder._id, localInvoice);
 
+    const apiTargetId = (targetOrder?._id && !String(targetOrder._id).startsWith('ord-'))
+      ? targetOrder._id
+      : (targetOrder?.orderNumber || cleanId);
+
+    const fullPaymentPayload = {
+      ...paymentData,
+      orderNumber: targetOrder?.orderNumber || (orderNum !== cleanId ? orderNum : undefined),
+    };
+
     // Optimistically update order
     updateOrdersState((prev) =>
       prev.map((o) => {
-        if (o._id === cleanId || o.id === cleanId || o.orderNumber === cleanId) {
+        if (o._id === cleanId || o.id === cleanId || o.orderNumber === cleanId || (orderNum && o.orderNumber === orderNum)) {
           return {
             ...o,
             paymentStatus: 'paid',
@@ -670,8 +726,21 @@ export const OrderProvider = ({ children }) => {
       })
     );
 
-    // Broadcast across app
+    // Broadcast across app and tabs
     if (typeof window !== 'undefined') {
+      try {
+        if ('BroadcastChannel' in window) {
+          const ch = new BroadcastChannel('sst_orders_channel');
+          ch.postMessage({
+            type: 'ORDER_STATUS_UPDATED',
+            orderId: cleanId,
+            order: { ...targetOrder, paymentStatus: 'paid', orderStatus: 'confirmed' },
+            invoice: localInvoice,
+          });
+          setTimeout(() => ch.close(), 1000);
+        }
+      } catch (e) {}
+
       window.dispatchEvent(
         new CustomEvent('sst_order_status_updated', {
           detail: { order: targetOrder, invoice: localInvoice },
@@ -686,7 +755,7 @@ export const OrderProvider = ({ children }) => {
     }
 
     try {
-      const response = await api.patch(`/admin/orders/${cleanId}/payment`, paymentData);
+      const response = await api.patch(`/admin/orders/${apiTargetId}/payment`, fullPaymentPayload);
       if (response.data?.success) {
         const updated = response.data.order;
         const liveInvoice = response.data.invoice || localInvoice;
@@ -695,7 +764,7 @@ export const OrderProvider = ({ children }) => {
           saveStoredInvoice(liveInvoice.invoiceNumber, liveInvoice);
         }
         updateOrdersState((prev) =>
-          prev.map((o) => (o._id === updated._id || o.orderNumber === updated.orderNumber ? updated : o))
+          prev.map((o) => (o._id === updated._id || o.orderNumber === updated.orderNumber ? { ...o, ...updated, paymentStatus: 'paid' } : o))
         );
         return { success: true, order: updated, invoice: liveInvoice };
       }

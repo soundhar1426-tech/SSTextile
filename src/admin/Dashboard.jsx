@@ -278,36 +278,60 @@ export const Dashboard = () => {
           </div>
         ) : (
           filteredOrders.map((order) => {
-            let badgeStyle = "bg-[#FFF4E5] text-[#B76E00] border-[#FFE2B3]";
-            let dotColor = "bg-[#B76E00]";
             const isPaid = (order.paymentStatus || '').toLowerCase() === 'paid';
             const orderNum = order.orderNumber || order.id || `GTX-${order._id?.slice(-5)}`;
             const orderTotal = order.totalAmount || order.total || order.totalPayable || order.subtotal || 0;
             const buyer = order.customerDetails?.businessName || order.customerDetails?.name || order.customer?.name || order.buyerName || 'Customer';
             const orderStatus = order.orderStatus || order.status || 'new';
 
-            if (orderStatus.toLowerCase().includes('transit') || orderStatus.toLowerCase().includes('dispatched')) {
-              badgeStyle = "bg-[#E6F5F0] text-secondary border-secondary-container";
+            let badgeStyle = "bg-[#FFF4E5] text-[#B76E00] border-[#FFE2B3]";
+            let dotColor = "bg-[#B76E00]";
+            let displayStatusText = orderStatus;
+
+            if (isPaid) {
+              badgeStyle = "bg-[#E6F5F0] text-secondary border-secondary-fixed font-bold";
               dotColor = "bg-secondary";
-            } else if (isPaid || orderStatus.toLowerCase().includes('verified')) {
-              badgeStyle = "bg-secondary-container text-on-secondary-container border-secondary-fixed-dim";
+              displayStatusText = orderStatus.toLowerCase().includes('transit')
+                ? 'In Transit (Paid)'
+                : orderStatus.toLowerCase().includes('delivered')
+                ? 'Delivered (Paid)'
+                : 'Confirmed & Paid';
+            } else if (orderStatus.toLowerCase().includes('transit') || orderStatus.toLowerCase().includes('dispatched')) {
+              badgeStyle = "bg-[#E6F5F0] text-secondary border-secondary-container";
               dotColor = "bg-secondary";
             }
 
             return (
               <article
                 key={order._id || order.id}
-                className="bg-surface-container-lowest rounded-xl border border-outline-variant p-4 transition-all shadow-sm space-y-3"
+                className={`rounded-xl border p-4 transition-all shadow-sm space-y-3 ${
+                  isPaid
+                    ? 'bg-surface-container-lowest border-secondary-fixed/50 hover:border-secondary'
+                    : 'bg-surface-container-lowest border-outline-variant hover:border-primary/40'
+                }`}
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-2 flex-wrap">
                       <span className="text-label-lg font-label-lg font-bold text-primary font-mono">
                         #{orderNum}
                       </span>
-                      <span className="text-label-sm font-label-sm text-on-surface-variant px-1.5 py-0.5 rounded bg-surface-container font-mono">
-                        {order.poNumber || (isPaid ? 'PAID' : 'PENDING')}
-                      </span>
+                      {isPaid ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-bold font-mono px-2 py-0.5 rounded bg-[#E6F5F0] text-secondary border border-secondary-fixed">
+                          <span className="material-symbols-outlined text-[13px]">verified</span>
+                          <span>PAID</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs font-bold font-mono px-2 py-0.5 rounded bg-[#FFF4E5] text-[#B76E00] border border-[#FFE2B3]">
+                          <span className="material-symbols-outlined text-[13px]">pending</span>
+                          <span>PENDING PAY</span>
+                        </span>
+                      )}
+                      {order.poNumber && (
+                        <span className="text-[11px] font-mono text-on-surface-variant px-1.5 py-0.5 rounded bg-surface-container">
+                          {order.poNumber}
+                        </span>
+                      )}
                     </div>
                     <h3 className="text-body-md font-body-md font-semibold text-primary mt-0.5">
                       {buyer}
@@ -316,7 +340,7 @@ export const Dashboard = () => {
 
                   <span className={`inline-flex items-center px-2.5 py-1 rounded text-label-sm font-label-sm font-bold border ${badgeStyle} capitalize`}>
                     <span className={`w-1.5 h-1.5 rounded-full ${dotColor} mr-1.5 pulse-live`}></span>
-                    {orderStatus}
+                    {displayStatusText}
                   </span>
                 </div>
 
@@ -360,25 +384,32 @@ export const Dashboard = () => {
                       <span className="material-symbols-outlined text-[15px] mr-1">local_shipping</span>
                       {order.deliveryDetails?.transporter || order.transporter || 'VRL Logistics Cargo'}
                     </span>
-                    <span className="text-[11px] text-on-surface-variant font-mono font-bold">
-                      {isPaid ? `PAID (${order.invoiceNumber || 'Invoiced'})` : 'PAYMENT PENDING'}
-                    </span>
+                    {isPaid ? (
+                      <span className="text-xs text-secondary font-mono font-bold flex items-center justify-end gap-1">
+                        <span className="material-symbols-outlined text-[14px]">verified</span>
+                        <span>PAID ({order.invoiceNumber || 'Invoiced'})</span>
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-[#B76E00] font-mono font-bold">
+                        PAYMENT PENDING
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                  <Link
-                    to={isPaid ? `/invoice/${order._id || orderNum}` : `/admin/orders?checkOrder=${order._id || orderNum}`}
-                    className={`w-full py-2 px-3 rounded-lg font-label-lg text-label-lg font-bold flex items-center justify-center space-x-2 active:scale-95 transition-all shadow-sm ${
-                      isPaid
-                        ? 'bg-primary text-white hover:bg-primary/90'
-                        : 'bg-secondary text-white hover:bg-secondary/90'
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-[18px]">
-                      {isPaid ? 'receipt_long' : 'fact_check'}
-                    </span>
-                    <span>{isPaid ? 'View Tax Invoice' : 'Check Bill & Confirm'}</span>
-                  </Link>
+                <Link
+                  to={isPaid ? `/invoice/${order._id || orderNum}` : `/admin/orders?checkOrder=${order._id || orderNum}`}
+                  className={`w-full py-2.5 px-3 rounded-lg font-label-lg text-label-lg font-bold flex items-center justify-center space-x-2 active:scale-95 transition-all shadow-sm ${
+                    isPaid
+                      ? 'bg-primary-container text-white hover:bg-primary'
+                      : 'bg-secondary text-white hover:bg-secondary/90'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[18px]">
+                    {isPaid ? 'receipt_long' : 'fact_check'}
+                  </span>
+                  <span>{isPaid ? 'View Tax Invoice (Paid)' : 'Check Bill & Confirm'}</span>
+                </Link>
               </article>
             );
           })

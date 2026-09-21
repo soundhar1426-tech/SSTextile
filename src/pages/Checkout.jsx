@@ -179,7 +179,7 @@ export const Checkout = () => {
             <div className="flex items-center gap-1.5">
               <span className="inline-block w-2 h-2 rounded-full bg-secondary pulse-live"></span>
               <span className="font-label-sm text-label-sm tracking-wider text-secondary font-bold uppercase">
-                GOWTHAM TEX B2B CHECKOUT
+                SSTEXTILES B2B CHECKOUT
               </span>
             </div>
             <span className="font-label-sm text-label-sm text-on-surface-variant font-bold">
@@ -572,7 +572,7 @@ export const Checkout = () => {
                   <span>Payment Process:</span>
                 </div>
                 <p>
-                  Payment is handled outside the website. Gowtham Tex admin will verify payment upon order submission and issue the final GST invoice.
+                  Payment is handled outside the website. SSTextiles admin will verify payment upon order submission and issue the final GST invoice.
                 </p>
               </div>
             </section>

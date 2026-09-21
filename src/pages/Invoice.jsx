@@ -268,11 +268,11 @@ export const Invoice = () => {
     transportMode: (isInvoiceCustomized && invoice?.transportMode) ? invoice.transportMode : (invoice?.transportMode || millSettings?.transportMode || 'Road Cargo / VRL Logistics'),
     signatoryTitle: (isInvoiceCustomized && (invoice?.signatoryTitle || invoice?.millDetails?.signatoryTitle)) ? (invoice.signatoryTitle || invoice.millDetails.signatoryTitle) : (invoice?.signatoryTitle || invoice?.millDetails?.signatoryTitle || millSettings?.signatoryTitle || 'Proprietor'),
     bankDetails: {
-      accountName: (isInvoiceCustomized && invoice?.millDetails?.bankDetails?.accountName) ? invoice.millDetails.bankDetails.accountName : (invoice?.millDetails?.bankDetails?.accountName || millSettings?.bankDetails?.accountName || millInfo?.bankDetails?.accountName || 'SS TEX'),
-      bankName: (isInvoiceCustomized && invoice?.millDetails?.bankDetails?.bankName) ? invoice.millDetails.bankDetails.bankName : (invoice?.millDetails?.bankDetails?.bankName || millSettings?.bankDetails?.bankName || millInfo?.bankDetails?.bankName || 'Tamilnadu Mercantile Bank'),
-      branch: (isInvoiceCustomized && invoice?.millDetails?.bankDetails?.branch) ? invoice.millDetails.bankDetails.branch : (invoice?.millDetails?.bankDetails?.branch || millSettings?.bankDetails?.branch || millInfo?.bankDetails?.branch || 'Pallagoundanpalayam'),
-      accountNumber: (isInvoiceCustomized && invoice?.millDetails?.bankDetails?.accountNumber) ? invoice.millDetails.bankDetails.accountNumber : (invoice?.millDetails?.bankDetails?.accountNumber || millSettings?.bankDetails?.accountNumber || millInfo?.bankDetails?.accountNumber || '39815005080789'),
-      ifsc: (isInvoiceCustomized && invoice?.millDetails?.bankDetails?.ifsc) ? invoice.millDetails.bankDetails.ifsc : (invoice?.millDetails?.bankDetails?.ifsc || millSettings?.bankDetails?.ifsc || millInfo?.bankDetails?.ifsc || 'TMBL0900789'),
+      accountName: (isInvoiceCustomized && invoice?.millDetails?.bankDetails?.accountName) ? invoice.millDetails.bankDetails.accountName : (invoice?.millDetails?.bankDetails?.accountName || millSettings?.bankDetails?.accountName || millInfo?.bankDetails?.accountName || 'SSTextiles'),
+      bankName: (isInvoiceCustomized && invoice?.millDetails?.bankDetails?.bankName) ? invoice.millDetails.bankDetails.bankName : (invoice?.millDetails?.bankDetails?.bankName || millSettings?.bankDetails?.bankName || millInfo?.bankDetails?.bankName || 'State Bank of India'),
+      branch: (isInvoiceCustomized && invoice?.millDetails?.bankDetails?.branch) ? invoice.millDetails.bankDetails.branch : (invoice?.millDetails?.bankDetails?.branch || millSettings?.bankDetails?.branch || millInfo?.bankDetails?.branch || 'Erode Main Branch'),
+      accountNumber: (isInvoiceCustomized && invoice?.millDetails?.bankDetails?.accountNumber) ? invoice.millDetails.bankDetails.accountNumber : (invoice?.millDetails?.bankDetails?.accountNumber || millSettings?.bankDetails?.accountNumber || millInfo?.bankDetails?.accountNumber || '30001234567'),
+      ifsc: (isInvoiceCustomized && invoice?.millDetails?.bankDetails?.ifsc) ? invoice.millDetails.bankDetails.ifsc : (invoice?.millDetails?.bankDetails?.ifsc || millSettings?.bankDetails?.ifsc || millInfo?.bankDetails?.ifsc || 'SBIN0001234'),
     },
   };
 

@@ -36,7 +36,7 @@ export const AdminSettings = () => {
         }
         try {
           localStorage.setItem('gtex_user', JSON.stringify(updatedUser));
-        } catch (e) {}
+        } catch (e) { }
       }
 
       setSaved(true);
@@ -144,7 +144,7 @@ export const AdminSettings = () => {
               type="text"
               value={settings.phone || ''}
               onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
-              placeholder="80728 65362, 94890 40067, 95666 47834"
+              placeholder=" 95666 47874"
               className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-body-sm text-primary"
             />
           </div>
@@ -156,7 +156,7 @@ export const AdminSettings = () => {
               type="email"
               value={settings.email || ''}
               onChange={(e) => setSettings({ ...settings, email: e.target.value })}
-              placeholder="orders@gowthamtex.com"
+              placeholder="orders@sstex.com"
               className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-body-sm text-primary"
             />
           </div>
@@ -256,7 +256,7 @@ export const AdminSettings = () => {
               ...settings,
               bankDetails: { ...settings.bankDetails, accountName: e.target.value }
             })}
-            placeholder="e.g. GOWTHAM TEX COMMERCIAL ACCOUNT"
+            placeholder="e.g. SSTEXTILES COMMERCIAL ACCOUNT"
             className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-body-sm text-primary font-semibold"
           />
         </div>

@@ -28,7 +28,7 @@ const SLOT_LABELS = [
 export const ProductForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { createProduct, updateProduct, deleteProduct } = useProducts();
+  const { createProduct, updateProduct, deleteProduct, getProductById } = useProducts();
   
   const multiFileInputRef = useRef(null);
   const singleSlotFileInputRef = useRef(null);
@@ -124,15 +124,15 @@ export const ProductForm = () => {
     setNewSizeForm(updated);
   };
 
-  // Fetch existing product from MongoDB if in edit mode
+  // Load product if editing
   useEffect(() => {
     if (isEdit && id) {
       const fetchProductDetail = async () => {
         setLoadingProduct(true);
         try {
-          const res = await api.get(`/admin/products/${id}`);
-          if (res.data.success && res.data.product) {
-            const p = res.data.product;
+          const res = await getProductById(id);
+          if (res && (res.success || res.product)) {
+            const p = res.product || res;
             setFormData({
               title: p.name || p.title || '',
               subtitle: p.description || p.subtitle || '',
@@ -170,7 +170,7 @@ export const ProductForm = () => {
             }
           }
         } catch (err) {
-          setErrorMessage(err.response?.data?.message || 'Failed to load product details');
+          console.warn('[ProductForm] Notice loading product detail:', err);
         } finally {
           setLoadingProduct(false);
         }
@@ -178,7 +178,7 @@ export const ProductForm = () => {
 
       fetchProductDetail();
     }
-  }, [id, isEdit]);
+  }, [id, isEdit, getProductById]);
 
   // Client-side canvas optimization for image file
   const optimizeImage = (file) => {

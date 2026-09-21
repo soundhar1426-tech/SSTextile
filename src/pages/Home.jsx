@@ -72,12 +72,13 @@ export const Home = () => {
     : null;
 
   const currentMill = millSettings || millInfo;
-  const millName = currentMill?.name || millInfo.name || 'GOWTHAM TEX';
-  const millPhoneRaw = currentMill?.phone || millInfo.phone || '95666 47825';
-  const millWhatsappRaw = currentMill?.whatsapp || millInfo.whatsapp || '918072865362';
+  const millName = currentMill?.name || millInfo.name || 'SSTextiles';
+  const millPhoneRaw = currentMill?.phone || millInfo.phone || '98765 43210, 98765 43211';
+  const millWhatsappRaw = currentMill?.whatsapp || millInfo.whatsapp || '919876543210';
   const millTagline = currentMill?.tagline || millInfo.tagline || 'Whole Sale Hand Looms Cloth Manufacturer';
   const millSubTagline = currentMill?.subTagline || millInfo.subTagline || 'Direct Mill White Towels. Direct Loom Pricing.';
-  const millAddress = currentMill?.address || millInfo.address || 'D/No. 1/144,2nd street K nagar Kunnathur - 638 103. (Via) Tirupur Dt. Tamilnadu.';
+  const millAddress = currentMill?.address || millInfo.address || '123, Weaver Street, Textile Nagar, Erode - 638 001, Tamil Nadu.';
+  const millGstin = currentMill?.gstin || millInfo.gstin || '33AAAAA0000A1Z5';
 
   const millPhoneList = useMemo(() => {
     return millPhoneRaw
@@ -91,7 +92,7 @@ export const Home = () => {
       const digits = millWhatsappRaw.split(',')[0].replace(/\D/g, '');
       return digits.length === 10 ? `91${digits}` : digits;
     }
-    const firstPhone = millPhoneList[0] || '80728 65362';
+    const firstPhone = millPhoneList[0] || '98765 43210';
     const digits = firstPhone.replace(/\D/g, '');
     return digits.length === 10 ? `91${digits}` : (digits.startsWith('91') ? digits : `91${digits.slice(-10)}`);
   }, [millWhatsappRaw, millPhoneList]);
@@ -104,13 +105,13 @@ export const Home = () => {
           <div className="flex items-center gap-2 font-medium">
             <span className="w-2 h-2 rounded-full bg-secondary pulse-live"></span>
             <span className="text-primary font-bold">SSTextiles</span>
-            <span className="hidden sm:inline text-outline">• Direct towel Manufacturer</span>
+            <span className="hidden sm:inline text-outline">• Direct Towel Manufacturer</span>
           </div>
 
           <div className="flex items-center gap-4 text-label-sm font-semibold text-primary">
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1 font-mono">
               <span className="material-symbols-outlined text-[16px] text-secondary">receipt</span>
-              GST 5%
+              GSTIN: {millGstin} (5% GST)
             </span>
           </div>
         </div>

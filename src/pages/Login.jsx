@@ -37,7 +37,7 @@ export const Login = () => {
     <div className="max-w-md mx-auto px-4 py-12 space-y-6 pb-24">
       <div className="text-center space-y-2">
         <div className="w-12 h-12 bg-primary-container text-white rounded-xl flex items-center justify-center mx-auto text-xl font-bold shadow-sm">
-          G
+          S
         </div>
         <h1 className="text-headline-sm font-bold text-primary">
           B2B Wholesale Portal Login

@@ -316,7 +316,7 @@ export const Profile = () => {
                 required
                 value={formData.email}
                 onChange={handleChange}
-                placeholder="e.g. admin@gowthamtex.com"
+                placeholder="e.g. admin@sstextiles.com"
                 className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3.5 py-2.5 text-body-sm text-primary font-medium focus:border-primary-container focus:bg-white outline-none transition-all"
               />
               <span className="text-[11px] text-outline mt-1 block">Used to sign in to your account</span>

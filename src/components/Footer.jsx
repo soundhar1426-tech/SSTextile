@@ -9,13 +9,13 @@ export const Footer = () => {
   const { isAuthenticated, currentUser } = useAuth();
   const currentMill = millSettings || millInfo;
 
-  const millName = currentMill?.name || millInfo.name || 'GOWTHAM TEX';
+  const millName = currentMill?.name || millInfo.name || 'SSTextiles';
   const millTagline = currentMill?.tagline || millInfo.tagline || 'Whole Sale Hand Looms Cloth Manufacturer';
-  const millAddress = currentMill?.address || millInfo.address || 'D/No. 1/144, Devanampalayam, VELLIRAVELI (P.O.), Kunnathur - 638 103. (Via) Tirupur Dt. Tamilnadu.';
-  const millGstin = currentMill?.gstin || millInfo.gstin || '33BRWPV7711D1ZD';
-  const millPan = currentMill?.pan || millInfo.pan || 'BRWPV7711D';
-  const millEmail = currentMill?.email || millInfo.email || 'orders@gowthamtex.com';
-  const rawPhone = currentMill?.phone || millInfo.phone || '80728 65362, 94890 40067, 95666 47834';
+  const millAddress = currentMill?.address || millInfo.address || '123, Weaver Street, Textile Nagar, Erode - 638 001, Tamil Nadu.';
+  const millGstin = currentMill?.gstin || millInfo.gstin || '33AAAAA0000A1Z5';
+  const millPan = currentMill?.pan || millInfo.pan || 'AAAAA0000A';
+  const millEmail = currentMill?.email || millInfo.email || 'contact@sstextiles.com';
+  const rawPhone = currentMill?.phone || millInfo.phone || '98765 43210, 98765 43211';
 
   const phoneList = rawPhone
     .split(',')

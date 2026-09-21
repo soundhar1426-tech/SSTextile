@@ -34,7 +34,7 @@ export const AdminLogin = () => {
       <div className="max-w-md w-full space-y-6">
         <div className="text-center space-y-2">
           <div className="w-14 h-14 bg-primary-container text-white rounded-2xl flex items-center justify-center mx-auto text-2xl font-bold shadow-md">
-            G
+            S
           </div>
           <h1 className="text-headline-sm font-bold text-primary">
             SSTextiles Admin Portal

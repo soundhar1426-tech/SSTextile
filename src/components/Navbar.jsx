@@ -40,11 +40,11 @@ export const Navbar = () => {
 
           <Link to="/" className="flex items-center gap-2 group">
             <div className="w-8 h-8 rounded bg-primary-container flex items-center justify-center text-on-primary font-bold text-lg shadow-sm">
-              {currentMill.name ? currentMill.name.charAt(0) : 'G'}
+              {currentMill.name ? currentMill.name.charAt(0) : 'S'}
             </div>
             <div>
               <span className="text-headline-sm font-bold text-primary tracking-tight block leading-none">
-                {currentMill.name || 'Gowtham Tex'}
+                {currentMill.name || 'SSTextiles'}
               </span>
               <span className="text-[10px] uppercase font-bold text-secondary tracking-widest block leading-tight">
                 Wholesale Towels
@@ -196,7 +196,7 @@ export const Navbar = () => {
               <div className="flex items-center justify-between pb-3 border-b border-outline-variant">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded bg-primary-container text-white flex items-center justify-center font-bold">
-                    {currentMill.name ? currentMill.name.charAt(0) : 'G'}
+                    {currentMill.name ? currentMill.name.charAt(0) : 'S'}
                   </div>
                   <div>
                     <span className="font-bold text-primary block leading-none">{currentMill.name || 'SSTextiles'}</span>
@@ -293,9 +293,9 @@ export const Navbar = () => {
             </div>
 
             {(() => {
-              const rawPhone = currentMill.phone || '80728 65362, 94890 40067, 95666 47834';
+              const rawPhone = currentMill.phone || '98765 43210, 98765 43211';
               const phoneList = rawPhone.split(',').map((p) => p.trim()).filter(Boolean);
-              const primaryPhone = phoneList[0] || '80728 65362';
+              const primaryPhone = phoneList[0] || '98765 43210';
               const rawDigits = primaryPhone.replace(/\D/g, '');
               const cleanTel = primaryPhone.startsWith('+') ? primaryPhone.replace(/[^\d+]/g, '') : `+91${rawDigits.slice(-10)}`;
 
@@ -306,7 +306,7 @@ export const Navbar = () => {
               return (
                 <div className="bg-surface-container p-3 rounded-xl border border-outline-variant text-label-sm text-on-surface-variant space-y-2.5">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-primary block">GSTIN: {currentMill.gstin || '33BRWUY7711D1ZD'}</span>
+                    <span className="font-bold text-primary block">GSTIN: {currentMill.gstin || '33AAAAA0000A1Z5'}</span>
                     <span className="text-[10px] bg-secondary-fixed text-secondary px-2 py-0.5 rounded-full font-bold">5% GST</span>
                   </div>
                   <div className="flex items-center justify-between pt-2 border-t border-outline-variant/60">

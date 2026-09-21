@@ -165,16 +165,16 @@ export const OrderSuccess = () => {
           <span className="text-label-md">Payment &amp; Final Invoice Note:</span>
         </div>
         <p className="text-body-sm leading-relaxed">
-          {currentMill.name || 'Gowtham Tex'} does not process automatic payments on the website. Once our accounting desk verifies your remittance (via UPI, Bank Transfer or Cash), your order payment status will be marked as <strong>PAID</strong> and your official <strong>Final GST Tax Invoice</strong> will be generated.
+          {currentMill.name || 'SSTextiles'} does not process automatic payments on the website. Once our accounting desk verifies your remittance (via UPI, Bank Transfer or Cash), your order payment status will be marked as <strong>PAID</strong> and your official <strong>Final GST Tax Invoice</strong> will be generated.
         </p>
         {(() => {
-          const rawPhone = currentMill.phone || '80728 65362, 94890 40067, 95666 47834';
+          const rawPhone = currentMill.phone || '98765 43210, 98765 43211';
           const rawDigits = rawPhone.replace(/\D/g, '');
           const cleanTel = rawPhone.startsWith('+') ? rawPhone.replace(/[^\d+]/g, '') : `+91${rawDigits.slice(-10)}`;
           const whatsappDigits = rawDigits.length === 10 ? `91${rawDigits}` : (rawDigits.startsWith('91') && rawDigits.length === 12 ? rawDigits : `91${rawDigits.slice(-10)}`);
           const orderNum = order?.orderNumber || order?.orderId || order?._id || displayOrderNumber || id || '';
           const orderTotal = Number(order?.totalAmount || order?.total || order?.subtotal || 0);
-          const whatsappMsg = `Hello ${currentMill.name || 'Gowtham Tex'}, I have placed Order #${orderNum}${orderTotal > 0 ? ` for ₹${orderTotal.toLocaleString('en-IN')}` : ''}. Please confirm dispatch and banking verification.`;
+          const whatsappMsg = `Hello ${currentMill.name || 'SSTextiles'}, I have placed Order #${orderNum}${orderTotal > 0 ? ` for ₹${orderTotal.toLocaleString('en-IN')}` : ''}. Please confirm dispatch and banking verification.`;
 
           return (
             <div className="pt-3 flex flex-wrap items-center justify-between gap-3 border-t border-outline-variant text-label-sm">

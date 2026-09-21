@@ -7,9 +7,9 @@ export const FloatingTradeDesk = () => {
   const currentMill = millSettings || millInfo;
   const [isOpen, setIsOpen] = useState(false);
 
-  const rawPhone = currentMill.phone || '95666 44564';
+  const rawPhone = currentMill.phone || '98765 43210, 98765 43211';
   const phoneList = rawPhone.split(',').map((p) => p.trim()).filter(Boolean);
-  const primaryPhone = phoneList[0] || '95666 44564';
+  const primaryPhone = phoneList[0] || '98765 43210';
 
   const rawDigits = primaryPhone.replace(/\D/g, '');
   const cleanTel = primaryPhone.startsWith('+') ? primaryPhone.replace(/[^\d+]/g, '') : `+91${rawDigits.slice(-10)}`;

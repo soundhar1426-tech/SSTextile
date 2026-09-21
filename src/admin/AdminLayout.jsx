@@ -45,7 +45,7 @@ export const AdminLayout = () => {
           </button>
           <div className="flex flex-col">
             <span className="text-headline-sm font-bold text-primary tracking-tight leading-none">
-              {currentMill.name || 'Gowtham Tex'}
+              {currentMill.name || 'SSTextiles'}
             </span>
             <span className="text-label-sm font-label-sm text-on-surface-variant tracking-wider uppercase font-bold">
               Admin Mill Portal

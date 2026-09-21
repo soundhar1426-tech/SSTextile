@@ -5,7 +5,7 @@ const settingsSchema = new mongoose.Schema(
     // Mill & Company Identity
     name: {
       type: String,
-      default: 'GOWTHAM TEX',
+      default: 'SSTextiles',
       trim: true,
     },
     tagline: {
@@ -20,33 +20,33 @@ const settingsSchema = new mongoose.Schema(
     },
     address: {
       type: String,
-      default: 'D/No. 1/144, Devanampalayam, VELLIRAVELI (P.O.), Kunnathur - 638 103. (Via) Tirupur Dt. Tamilnadu.',
+      default: '123, Weaver Street, Textile Nagar, Erode - 638 001, Tamil Nadu.',
       trim: true,
     },
     phone: {
       type: String,
-      default: '80728 65362, 94890 40067, 95666 47834',
+      default: '98765 43210, 98765 43211',
       trim: true,
     },
     whatsapp: {
       type: String,
-      default: '919566647834',
+      default: '919876543210',
       trim: true,
     },
     email: {
       type: String,
-      default: 'orders@gowthamtex.com',
+      default: 'contact@sstextiles.com',
       trim: true,
     },
     gstin: {
       type: String,
-      default: '33BRWPV7711D1ZD',
+      default: '33AAAAA0000A1Z5',
       trim: true,
       uppercase: true,
     },
     pan: {
       type: String,
-      default: 'BRWPV7711D',
+      default: 'AAAAA0000A',
       trim: true,
       uppercase: true,
     },
@@ -106,27 +106,27 @@ const settingsSchema = new mongoose.Schema(
     bankDetails: {
       bankName: {
         type: String,
-        default: 'Tamilnadu Mercantile Bank',
+        default: 'State Bank of India',
         trim: true,
       },
       branch: {
         type: String,
-        default: 'Pallagoundanpalayam',
+        default: 'Erode Main',
         trim: true,
       },
       accountName: {
         type: String,
-        default: 'GOWTHAM TEX',
+        default: 'SSTextiles',
         trim: true,
       },
       accountNumber: {
         type: String,
-        default: '325150050800389',
+        default: '000012345678901',
         trim: true,
       },
       ifsc: {
         type: String,
-        default: 'TMBL0000325',
+        default: 'SBIN0001234',
         trim: true,
         uppercase: true,
       },

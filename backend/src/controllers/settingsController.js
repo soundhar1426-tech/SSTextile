@@ -125,7 +125,8 @@ export const updateSettings = async (req, res) => {
 
     await settings.save();
 
-    // Also keep authenticated admin's User profile business info synchronized (without clobbering contact person name)
+    // Also keep authenticated admin's User profile business info & admin email synchronized
+    let updatedAdminUser = null;
     if (req.user?._id) {
       try {
         const adminUser = await User.findById(req.user._id);
@@ -133,13 +134,42 @@ export const updateSettings = async (req, res) => {
           if (sourceSettings.name !== undefined && sourceSettings.name.trim()) {
             adminUser.businessName = sourceSettings.name.trim();
           }
+          if (sourceSettings.adminName !== undefined && sourceSettings.adminName.trim()) {
+            adminUser.name = sourceSettings.adminName.trim();
+          }
           if (sourceSettings.phone !== undefined && sourceSettings.phone.trim()) {
             adminUser.phone = sourceSettings.phone.trim();
           }
           if (sourceSettings.gstin !== undefined) {
             adminUser.gstin = sourceSettings.gstin.trim().toUpperCase();
           }
+          if (sourceSettings.address !== undefined) {
+            adminUser.address = sourceSettings.address.trim();
+          }
+
+          // Allow editing the admin user's login email
+          const targetEmail = sourceSettings.adminEmail || sourceSettings.email;
+          if (targetEmail && targetEmail.trim()) {
+            const cleanEmail = targetEmail.toLowerCase().trim();
+            if (cleanEmail !== adminUser.email) {
+              const emailInUse = await User.findOne({ email: cleanEmail, _id: { $ne: adminUser._id } });
+              if (!emailInUse) {
+                adminUser.email = cleanEmail;
+              }
+            }
+          }
+
           await adminUser.save();
+          updatedAdminUser = {
+            id: adminUser._id,
+            _id: adminUser._id,
+            name: adminUser.name,
+            businessName: adminUser.businessName,
+            email: adminUser.email,
+            phone: adminUser.phone,
+            role: adminUser.role,
+            gstin: adminUser.gstin,
+          };
         }
       } catch (userSyncErr) {
         console.warn('[SettingsController] Warning: Could not sync admin user:', userSyncErr.message);
@@ -178,6 +208,7 @@ export const updateSettings = async (req, res) => {
       success: true,
       message: 'Mill configurations saved successfully.',
       settings,
+      user: updatedAdminUser || undefined,
     });
   } catch (error) {
     console.error('[Update Settings Error]', error);

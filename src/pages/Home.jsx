@@ -276,9 +276,9 @@ export const Home = () => {
 
                   {/* Live Inventory Status */}
                   <div className="absolute top-3.5 left-3.5 flex items-center gap-1.5 bg-white/95 backdrop-blur-md px-3 py-1 rounded-full border border-outline-variant shadow-xs">
-                    <span className={`w-2.5 h-2.5 rounded-full ${heroProduct.totalStock > 0 ? 'bg-secondary pulse-live' : 'bg-error'}`}></span>
-                    <span className={`font-label-sm text-label-sm font-bold uppercase ${heroProduct.totalStock > 0 ? 'text-secondary' : 'text-error'}`}>
-                      {(heroProduct.status || (heroProduct.totalStock > 0 ? 'IN STOCK • READY TO DISPATCH' : 'OUT OF STOCK'))}
+                    <span className="w-2.5 h-2.5 rounded-full bg-secondary pulse-live"></span>
+                    <span className="font-label-sm text-label-sm font-bold uppercase text-secondary">
+                      READY TO DISPATCH
                     </span>
                   </div>
 

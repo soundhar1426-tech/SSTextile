@@ -26,7 +26,9 @@ export const ProductCard = ({ product, selectedDimension, onSelectDimension }) =
   const rawMaterial = product.material || 'Cotton';
   const productMaterial = /cotton/i.test(rawMaterial) ? 'Cotton' : rawMaterial;
   const productSubtitle = product.subtitle || product.description || 'Premium institutional grade white terry towel for commercial use.';
-  const productStatus = product.status || (totalStock > 0 ? 'IN STOCK' : 'OUT OF STOCK');
+  const productStatus = product.status && !product.status.toLowerCase().includes('out of stock')
+    ? product.status
+    : 'READY TO DISPATCH';
   const weaveDisplay = product.weaveType ? product.weaveType.split(' ')[0] : '20s';
 
   // Check if a specific dimension is currently selected/filtered
@@ -97,8 +99,8 @@ export const ProductCard = ({ product, selectedDimension, onSelectDimension }) =
 
             {/* Live Inventory Badge */}
             <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 bg-white/95 backdrop-blur-sm px-2.5 py-0.5 rounded-full border border-outline-variant shadow-xs">
-              <span className={`w-2 h-2 rounded-full ${totalStock > 0 ? 'bg-secondary pulse-live' : 'bg-error'}`}></span>
-              <span className={`font-label-sm text-label-sm font-bold uppercase ${totalStock > 0 ? 'text-secondary' : 'text-error'}`}>
+              <span className="w-2 h-2 rounded-full bg-secondary pulse-live"></span>
+              <span className="font-label-sm text-label-sm font-bold uppercase text-secondary">
                 {productStatus}
               </span>
             </div>

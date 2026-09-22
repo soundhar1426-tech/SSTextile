@@ -15,8 +15,6 @@ dist-ssr
 .env.*
 .env.example
 
-# Backend directory (tracked in separate repository)
-backend/
 
 # Editor directories and files
 .vscode/*

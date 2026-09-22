@@ -2,11 +2,11 @@ import axios from 'axios';
 
 // Centralized Axios API instance for Gowtham Tex
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'https://sstextile-backendd.onrender.com/api',
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 10000,
+  timeout: 30000,
 });
 
 // Request interceptor: Attach JWT Bearer token if available in localStorage

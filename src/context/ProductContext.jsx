@@ -187,19 +187,24 @@ export const ProductProvider = ({ children }) => {
       return { success: true, product: localProduct };
     }
 
-    // 2. Try fetching from live backend with a fast timeout (2500ms)
+    // 2. Try fetching from live backend with a fast timeout
     try {
-      const response = await api.get(`/products/${cleanId}`, { timeout: 2500 });
+      const response = await api.get(`/products/${cleanId}`, { timeout: 4000 });
       if (response.data?.success && response.data.product) {
         return { success: true, product: response.data.product };
       }
     } catch (err) {
-      try {
-        const adminRes = await api.get(`/admin/products/${cleanId}`, { timeout: 2500 });
-        if (adminRes.data?.success && adminRes.data.product) {
-          return { success: true, product: adminRes.data.product };
-        }
-      } catch (adminErr) {}
+      const storedUser = localStorage.getItem('gtex_user');
+      const user = storedUser ? JSON.parse(storedUser) : null;
+      const token = localStorage.getItem('gtex_token');
+      if (user?.role === 'admin' && token) {
+        try {
+          const adminRes = await api.get(`/admin/products/${cleanId}`, { timeout: 4000 });
+          if (adminRes.data?.success && adminRes.data.product) {
+            return { success: true, product: adminRes.data.product };
+          }
+        } catch (adminErr) {}
+      }
     }
 
     if (localProduct) {
@@ -218,32 +223,40 @@ export const ProductProvider = ({ children }) => {
    * Fetch inventory summary metrics
    */
   const fetchInventorySummary = useCallback(async () => {
-    try {
-      const response = await api.get('/admin/products/inventory/summary');
-      if (response.data.success && response.data.summary) {
-        setInventorySummary(response.data.summary);
-        return;
+    const storedUser = localStorage.getItem('gtex_user');
+    const user = storedUser ? JSON.parse(storedUser) : null;
+    const token = localStorage.getItem('gtex_token');
+
+    if (user?.role === 'admin' && token) {
+      try {
+        const response = await api.get('/admin/products/inventory/summary');
+        if (response.data?.success && response.data?.summary) {
+          setInventorySummary(response.data.summary);
+          return;
+        }
+      } catch (err) {
+        // Fallback to local calculation below
       }
-    } catch (err) {
-      // Calculate locally
-      const currentList = products.length > 0 ? products : getInitialProducts();
-      let totalStock = 0;
-      let totalValue = 0;
-      let activeSizesCount = 0;
-      currentList.forEach((p) => {
-        (p.sizes || []).forEach((s) => {
-          totalStock += Number(s.stock || 0);
-          totalValue += Number(s.stock || 0) * Number(s.price || 0);
-          activeSizesCount++;
-        });
-      });
-      setInventorySummary({
-        totalProducts: currentList.length,
-        totalActiveSizes: activeSizesCount,
-        totalStockPieces: totalStock,
-        totalInventoryValue: totalValue,
-      });
     }
+
+    // Calculate locally if guest/customer or if request fails
+    const currentList = products.length > 0 ? products : getInitialProducts();
+    let totalStock = 0;
+    let totalValue = 0;
+    let activeSizesCount = 0;
+    currentList.forEach((p) => {
+      (p.sizes || []).forEach((s) => {
+        totalStock += Number(s.stock || 0);
+        totalValue += Number(s.stock || 0) * Number(s.price || 0);
+        activeSizesCount++;
+      });
+    });
+    setInventorySummary({
+      totalProducts: currentList.length,
+      totalActiveSizes: activeSizesCount,
+      totalStockPieces: totalStock,
+      totalInventoryValue: totalValue,
+    });
   }, [products]);
 
   /**
